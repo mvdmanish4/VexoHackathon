@@ -1,0 +1,19 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Secrets
+.env
+
+# Vexo kit is cloned by server/setup.sh, not committed
+server/vexo-open-kit/
+
+# Audio output
+*.wav
+*.mp3
+
+# Xcode
+ios/**/xcuserdata/
+ios/**/DerivedData/
+.DS_Store
