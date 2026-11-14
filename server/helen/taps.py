@@ -21,8 +21,9 @@ PAIR_WINDOW = 0.5      # two single taps this close together = a dash: the band 
 # alone is not enough either.
 SEND_FACES = ("+z", "+x")   # palm up (+z), or the natural quarter turn most people make (+x);
                             # measured on band 46, where the resting position is -z
-PALM_UP_Z = 0.4        # g: gravity along +z above this = palm up (read from the motion sensor,
-                       # since the band only reports "orientation" for a clean, straight turn)
+TURNED_Z = -0.3        # g: resting is about -1 g along z. Above this the wrist is turned more than
+                       # ~70 degrees (read from the motion sensor, since the band only reports
+                       # "orientation" for a clean, straight turn)
 # No automatic send after silence: stray taps would get spoken.
 
 
@@ -96,7 +97,7 @@ class TapReader:
             self.tell("band", f"{what}   letter so far: {self.decoder.current}")
 
     def palm_up(self):
-        return self.face in SEND_FACES or self.az > PALM_UP_Z
+        return self.face in SEND_FACES or self.az > TURNED_Z
 
     def _tilt(self):
         if self.palm_up():
