@@ -1,13 +1,13 @@
-"""Turns band gestures into Morse: tap = dot, double-tap = dash, wrist turned = send."""
+"""Turns band gestures into Morse: tap = dot, double-tap = dash, wrist turned and held = send."""
 import threading
 import time
 
 from helen.morse import Decoder
 
 TAP_THRESHOLD = 0.5    # g; lower = more sensitive (band default 0.8 missed taps)
-TURN_QUIET = 0.6       # seconds to ignore taps after a wrist turn (turning makes fake taps)
-SEND_FACE = "+z"       # face pointing up when the wrist is turned palm-up: send at once
-# Any wrist turn held for 2 s also sends (the band reports it as a "tilt").
+TURN_QUIET = 0.6       # seconds to ignore taps after a send (turning makes fake taps)
+# Send = wrist turned and held for 2 s (the band reports it as a "tilt"). A quick
+# orientation change is not used: the wrist moves that much while tapping.
 
 
 class TapReader:
@@ -20,9 +20,8 @@ class TapReader:
         self.last_turn = 0.0
         band.on("tap", lambda e: self._symbol("."))
         band.on("double-tap", lambda e: self._symbol("-"))
-        band.on("orientation", self._turn)
         band.on("tilt", lambda e: self._send())
-        band.set_events(kinds=["tap", "double-tap", "tilt", "orientation"],
+        band.set_events(kinds=["tap", "double-tap", "tilt"],
                         tap_threshold=TAP_THRESHOLD)
         band.configure(events=True)
         threading.Thread(target=self._clock, daemon=True).start()
@@ -35,11 +34,6 @@ class TapReader:
 
     def _mark_turn(self):
         self.last_turn = time.monotonic()
-
-    def _turn(self, e):
-        self._mark_turn()
-        if e.face == SEND_FACE:
-            self._send()
 
     def _send(self):
         self._mark_turn()
