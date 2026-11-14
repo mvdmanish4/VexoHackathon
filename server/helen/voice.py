@@ -6,7 +6,7 @@ import urllib.request
 
 from helen import config
 
-DEFAULT_VOICE = "21m00Tcm4TlvDq8ikWAM"   # ElevenLabs premade voice "Rachel"
+DEFAULT_VOICE = "SAz9YHcvj6GT2YYXdXww"   # ElevenLabs premade voice "River" (free accounts can use premade voices only)
 
 
 def synthesize(text):
@@ -28,7 +28,13 @@ def speak(text):
     if not config.get("ELEVENLABS_API_KEY"):
         subprocess.run(["say", text])
         return
+    try:
+        mp3 = synthesize(text)
+    except Exception as e:   # out of credits, network, ...: never go silent
+        print(f"!!! ElevenLabs failed ({e}), using the Mac voice", flush=True)
+        subprocess.run(["say", text])
+        return
     with tempfile.NamedTemporaryFile(suffix=".mp3") as f:
-        f.write(synthesize(text))
+        f.write(mp3)
         f.flush()
         subprocess.run(["afplay", f.name])

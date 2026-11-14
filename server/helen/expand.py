@@ -35,11 +35,13 @@ def expand(words, history=""):
     if words in QUICK:
         return QUICK[words]
     prompt = PROMPT.format(words=words, history=history or "(none)")
-    if config.get("GEMINI_API_KEY"):
-        return _gemini(prompt)
-    if config.get("OPENAI_API_KEY"):
-        return _openai(prompt)
-    return words.capitalize() + "."   # no AI key: say the words as they are
+    for key, ask in (("GEMINI_API_KEY", _gemini), ("OPENAI_API_KEY", _openai)):
+        if config.get(key):
+            try:
+                return ask(prompt)
+            except Exception as e:   # out of credits, network, ...: try the next service
+                print(f"!!! {key.split('_')[0]} failed ({e}), trying the next AI", flush=True)
+    return words.capitalize() + "."   # no AI available: say the words as they are
 
 
 def _post(url, body, headers):
