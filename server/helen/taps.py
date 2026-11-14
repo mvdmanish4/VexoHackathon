@@ -19,9 +19,9 @@ PAIR_WINDOW = 0.8      # two single taps this close together = a dash: the band 
 # Send = wrist turned palm-up AND held for 2 s (the band reports the hold as a "tilt").
 # A tilt alone is not enough (the wrist moves while tapping), and a quick turn to palm-up
 # alone is not enough either.
-SEND_FACES = ("+z", "+x")   # palm up (+z), or the natural quarter turn most people make (+x);
+SEND_FACES = ("+z", "+x", "-x")   # palm up (+z), or a quarter turn either way (+x, -x);
                             # measured on band 46, where the resting position is -z
-TURNED_Z = -0.3        # g: resting is about -1 g along z. Above this the wrist is turned more than
+TURNED_Z = -0.5        # g: resting is about -1 g along z. Above this the wrist is turned more than
                        # ~70 degrees (read from the motion sensor, since the band only reports
                        # "orientation" for a clean, straight turn)
 # No automatic send after silence: stray taps would get spoken.
