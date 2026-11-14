@@ -44,14 +44,19 @@ def expand(words, history=""):
     words = words.strip().upper()
     if words in QUICK:
         return QUICK[words]
-    prompt = PROMPT.format(words=words, history=history or "(none)")
-    for key, ask in (("GEMINI_API_KEY", _gemini), ("OPENAI_API_KEY", _openai)):
+    answer = ask(PROMPT.format(words=words, history=history or "(none)"))
+    return answer or words.capitalize() + "."   # no AI available: say the words as they are
+
+
+def ask(prompt):
+    """Answer from the first AI that works (Gemini, then OpenAI), or None if none does."""
+    for key, service in (("GEMINI_API_KEY", _gemini), ("OPENAI_API_KEY", _openai)):
         if config.get(key):
             try:
-                return ask(prompt)
+                return service(prompt)
             except Exception as e:   # out of credits, network, ...: try the next service
                 print(f"!!! {key.split('_')[0]} failed ({e}), trying the next AI", flush=True)
-    return words.capitalize() + "."   # no AI available: say the words as they are
+    return None
 
 
 def _post(url, body, headers):
