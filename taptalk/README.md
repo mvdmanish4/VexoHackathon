@@ -29,11 +29,10 @@ No screen, no sight and no hearing needed: every control is a touch gesture.
 | Longer pause (starts at 2.6 s) | space between words |
 | Six or more single taps in one letter | delete the last letter |
 | Turn the wrist over and hold it for half a second | **send**: the message is spoken |
-| Stay still (starts at 6 s) | send (fallback) |
 
 **The pauses adapt to the person.** After a few letters TapTalk measures how fast they tap
 and sets the letter pause to 3× their usual gap between taps (0.6–2.0 s), the word pause to
-2.2× that, and the auto-send to 4× (at least 4 s). A practised tapper ends up around
+2.2× that. A practised tapper ends up around
 0.8 s per letter. `--fixed` turns this off.
 
 Morse cheat sheet:
@@ -88,7 +87,8 @@ not taps, and the time from send to sound. `--double-window` and `--tap-g` set t
 detector (use the numbers `--calibrate` prints). `--no-ai` speaks the letters as tapped.
 `--no-eleven` uses the Mac voice. `--letter-gap`, `--word-gap` and `--send-gap` change the
 starting pauses. `--fixed` keeps them fixed. `--no-speculate` turns off preparing the voice
-while tapping. `--detector band` uses the band's own tap events; with it, `--tap-threshold`, `--send-face`
+while tapping. `--tap-width` is the longest a tap's jolt may last. `--send-gap 6` also sends after 6 s of
+stillness (off by default, so a stray tap is never spoken). `--detector band` uses the band's own tap events; with it, `--tap-threshold`, `--send-face`
 (default `+z`) and `--dedup` apply.
 
 ## Sponsor keys (optional)
@@ -129,6 +129,7 @@ the fallback.
    before, then `-> dot` or `-> dash`.
    - Taps missed: lower `--tap-g` (for example 0.6).
    - Arm moves count as taps: raise `--tap-g`.
+   - Real taps print as `movement ... not a tap`: raise `--tap-width` (for example 0.10).
    - A double tap comes out as two dots: raise `--double-window` a little.
    - Two dots come out as a dash: lower it, or tap dots a little slower.
 3. Turn the wrist over and hold it: `--debug` prints `send`.

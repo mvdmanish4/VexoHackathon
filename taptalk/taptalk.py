@@ -3,7 +3,7 @@
     single tap = dot         double tap = dash
     short pause = next letter    longer pause = space   (pauses adapt to your speed)
     6 or more dots = delete the last letter
-    turn the wrist over and hold it = send      or stay still a few seconds = send
+    turn the wrist over and hold it = send
 
 Taps are found in the band's raw accelerometer (833 readings a second), not with the band's
 own double-tap, which often splits one double tap into two taps. Gemini turns short taps
@@ -49,11 +49,14 @@ def parse_args():
                    help="two taps closer than this (s) are one double tap = dash (set it with --calibrate)")
     p.add_argument("--tap-g", type=float, default=1.0,
                    help="raw detector: how hard a tap must be, in g (lower = lighter taps count)")
+    p.add_argument("--tap-width", type=float, default=0.05,
+                   help="raw detector: the longest a tap's jolt may last (s); raise it if --debug "
+                        "shows real taps as 'movement'")
     p.add_argument("--no-ai", action="store_true", help="speak the tapped letters as they are (no Gemini)")
     p.add_argument("--no-eleven", action="store_true", help="use the Mac's voice, not ElevenLabs")
     p.add_argument("--letter-gap", type=float, default=1.2, help="starting pause (s) that ends a letter")
     p.add_argument("--word-gap", type=float, default=2.6, help="starting pause (s) that ends a word")
-    p.add_argument("--send-gap", type=float, default=6.0, help="starting pause (s) that sends (0 = off)")
+    p.add_argument("--send-gap", type=float, default=0, help="stay still this long (s) to send; 0 = off (default: only the wrist turn sends)")
     p.add_argument("--fixed", action="store_true", help="keep the pauses fixed (do not adapt to the tapper)")
     p.add_argument("--no-speculate", action="store_true", help="do not prepare the voice while tapping")
     p.add_argument("--dedup", type=float, default=0,
@@ -71,6 +74,8 @@ def parse_args():
         p.error("--double-window must be between 0.1 and 1.0 seconds")
     if not 0.2 <= a.tap_g <= 8:
         p.error("--tap-g must be between 0.2 and 8")
+    if not 0.01 <= a.tap_width <= 0.3:
+        p.error("--tap-width must be between 0.01 and 0.3 seconds")
     if a.sim:
         if a.calibrate:
             p.error("--calibrate needs the real band")
@@ -91,8 +96,18 @@ def start_motion(band):
 
 
 def run_calibration(band, a, voice):
-    taps = []
-    det = TapDetector(threshold=min(a.tap_g, 0.6), on_tap=lambda t, s: taps.append((t, s)))
+    taps, rejected = [], []
+
+    def on_tap(t, strength):
+        taps.append((t, strength))
+        print("    tap %.1f g" % strength)
+
+    def on_reject(t, strength, width):
+        rejected.append(width)
+        print("    (movement %.1f g for %d ms: not counted)" % (strength, width * 1000))
+
+    det = TapDetector(threshold=min(a.tap_g, 0.6), max_width=a.tap_width,
+                      on_tap=on_tap, on_reject=on_reject)
 
     def on_motion(m):
         if m.ax is not None:
@@ -120,6 +135,10 @@ def run_calibration(band, a, voice):
     tap_g = max(0.3, round(0.5 * statistics.median(strengths), 1)) if strengths else a.tap_g
 
     print()
+    if len(rejected) > len(strengths):
+        wide = min(0.3, round(1.5 * statistics.median(rejected), 2))
+        print("  Many jolts lasted too long to count as taps. If those were your taps, run again "
+              "with --tap-width %.2f\n" % wide)
     if window is None:
         print("  Calibration failed: %s. Run it again, tapping a little harder." % rep["why"])
         voice.say("Calibration failed. Please try again.")
@@ -129,8 +148,8 @@ def run_calibration(band, a, voice):
         print("  Tap strength: %.1f g typical" % statistics.median(strengths))
         if not rep["ok"]:
             print("  Warning: %s." % rep["why"])
-        print("\n  Use:  python3 taptalk.py --band %d --double-window %.2f --tap-g %.1f\n"
-              % (a.band, window, tap_g))
+        print("\n  Use:  python3 taptalk.py --band %d --double-window %.2f --tap-g %.1f%s\n"
+              % (a.band, window, tap_g, "" if a.tap_width == 0.05 else " --tap-width %.2f" % a.tap_width))
         voice.say("Done. Double tap window %d milliseconds." % round(window * 1000))
     voice.wait()
 
@@ -275,7 +294,8 @@ def setup_raw(band, a, dec):
     def on_reject(t, strength, width):
         log("movement %.1f g for %d ms: not a tap" % (strength, width * 1000))
 
-    det = TapDetector(threshold=a.tap_g, on_tap=on_tap, on_reject=on_reject if a.debug else None)
+    det = TapDetector(threshold=a.tap_g, max_width=a.tap_width, on_tap=on_tap,
+                      on_reject=on_reject if a.debug else None)
 
     def on_motion(m):
         if m.ax is not None:
