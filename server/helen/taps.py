@@ -15,8 +15,10 @@ WORD_GAP = 6.0         # pause that ends a word
 ADAPTIVE = False       # adapting shortened the pauses too much for careful tappers
 PAIR_WINDOW = 0.5      # two single taps this close together = a dash: the band often reports a
                        # quick double-tap as two single taps instead of one "double-tap"
-# Send = wrist turned and held for 2 s (the band reports it as a "tilt"). A quick
-# orientation change is not used: the wrist moves that much while tapping.
+# Send = wrist turned palm-up AND held for 2 s (the band reports the hold as a "tilt").
+# A tilt alone is not enough (the wrist moves while tapping), and a quick turn to palm-up
+# alone is not enough either.
+SEND_FACE = "+z"       # face pointing up when the palm is up (measured on band 46; rest is -z)
 # No automatic send after silence: stray taps would get spoken.
 
 
@@ -41,8 +43,10 @@ class TapReader:
         self.lock = threading.Lock()
         band.on("tap", lambda e: self._tap())
         band.on("double-tap", lambda e: self._double())
-        band.on("tilt", lambda e: self._send())
-        band.set_events(kinds=["tap", "double-tap", "tilt"], tap_threshold=TAP_THRESHOLD)
+        self.face = None
+        band.on("orientation", lambda e: setattr(self, "face", e.face))
+        band.on("tilt", lambda e: self._tilt())
+        band.set_events(kinds=["tap", "double-tap", "tilt", "orientation"], tap_threshold=TAP_THRESHOLD)
         band.configure(events=True)
         threading.Thread(target=self._clock, daemon=True).start()
 
@@ -60,7 +64,10 @@ class TapReader:
 
     def _double(self):
         with self.lock:
-            self.pending = None      # the band's own double-tap: any waiting tap was part of it
+            dot_first = self.pending is not None   # a single tap just before is its own dot
+            self.pending = None
+        if dot_first:
+            self._symbol(self.decoder.dot, "tap = .")
         self._symbol(self.decoder.dash, "double-tap = -")
 
     def _flush(self):
@@ -77,6 +84,12 @@ class TapReader:
         if now - self.last_turn >= TURN_QUIET:
             add(now)
             self.tell("band", f"{what}   letter so far: {self.decoder.current}")
+
+    def _tilt(self):
+        if self.face == SEND_FACE:
+            self._send()
+        else:
+            self.tell("band", f"wrist moved (face {self.face}), not palm-up: no send")
 
     def _send(self):
         self.last_turn = time.monotonic()
