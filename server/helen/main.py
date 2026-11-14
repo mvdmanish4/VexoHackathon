@@ -50,9 +50,7 @@ def say(words):
         sentence = expand(words, "\n".join(history[-6:]))
         log(f"<<< SAYING: {sentence}")
         history.append("Me: " + sentence)
-        if phone.phones():
-            say_on_phone(sentence)
-            return
+        phone.send({"type": "say", "text": sentence})   # pages show it; the laptop speaks it
         if listener:
             listener.mute(30)            # don't transcribe our own voice
         speak(sentence)
