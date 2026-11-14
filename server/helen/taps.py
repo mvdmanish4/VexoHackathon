@@ -19,6 +19,8 @@ PAIR_WINDOW = 0.5      # two single taps this close together = a dash: the band 
 # A tilt alone is not enough (the wrist moves while tapping), and a quick turn to palm-up
 # alone is not enough either.
 SEND_FACE = "+z"       # face pointing up when the palm is up (measured on band 46; rest is -z)
+PALM_UP_Z = 0.4        # g: gravity along +z above this = palm up (read from the motion sensor,
+                       # since the band only reports "orientation" for a clean, straight turn)
 # No automatic send after silence: stray taps would get spoken.
 
 
@@ -44,10 +46,12 @@ class TapReader:
         band.on("tap", lambda e: self._tap())
         band.on("double-tap", lambda e: self._double())
         self.face = None
+        self.az = 0.0                # latest gravity along z, in g
         band.on("orientation", lambda e: setattr(self, "face", e.face))
+        band.on("motion", lambda e: setattr(self, "az", e.az))
         band.on("tilt", lambda e: self._tilt())
         band.set_events(kinds=["tap", "double-tap", "tilt", "orientation"], tap_threshold=TAP_THRESHOLD)
-        band.configure(events=True)
+        band.configure(events=True, motion=10, sensors="accel")
         threading.Thread(target=self._clock, daemon=True).start()
 
     def _tap(self):
@@ -85,11 +89,14 @@ class TapReader:
             add(now)
             self.tell("band", f"{what}   letter so far: {self.decoder.current}")
 
+    def palm_up(self):
+        return self.face == SEND_FACE or self.az > PALM_UP_Z
+
     def _tilt(self):
-        if self.face == SEND_FACE:
+        if self.palm_up():
             self._send()
         else:
-            self.tell("band", f"wrist moved (face {self.face}), not palm-up: no send")
+            self.tell("band", f"wrist moved (face {self.face}, z {self.az:+.2f} g), not palm-up: no send")
 
     def _send(self):
         self.last_turn = time.monotonic()
