@@ -6,8 +6,8 @@ from helen.morse import Decoder
 
 TAP_THRESHOLD = 0.5    # g; lower = more sensitive (band default 0.8 missed taps)
 TURN_QUIET = 0.6       # seconds to ignore taps after a wrist turn (turning makes fake taps)
-REST_FACE = "-z"       # face pointing up while the arm rests normally
-SEND_FACE = "+z"       # face pointing up when the wrist is turned over: send
+SEND_FACE = "+z"       # face pointing up when the wrist is turned palm-up: send at once
+# Any wrist turn held for 2 s also sends (the band reports it as a "tilt").
 
 
 class TapReader:
@@ -21,7 +21,7 @@ class TapReader:
         band.on("tap", lambda e: self._symbol("."))
         band.on("double-tap", lambda e: self._symbol("-"))
         band.on("orientation", self._turn)
-        band.on("tilt", lambda e: self._mark_turn())
+        band.on("tilt", lambda e: self._send())
         band.set_events(kinds=["tap", "double-tap", "tilt", "orientation"],
                         tap_threshold=TAP_THRESHOLD)
         band.configure(events=True)
@@ -39,9 +39,13 @@ class TapReader:
     def _turn(self, e):
         self._mark_turn()
         if e.face == SEND_FACE:
-            message = self.decoder.take()
-            if message:
-                self.on_send(message)
+            self._send()
+
+    def _send(self):
+        self._mark_turn()
+        message = self.decoder.take()
+        if message:
+            self.on_send(message)
 
     def _clock(self):
         while True:

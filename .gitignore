@@ -17,3 +17,4 @@ server/vexo-open-kit/
 ios/**/xcuserdata/
 ios/**/DerivedData/
 .DS_Store
+server/logs/
