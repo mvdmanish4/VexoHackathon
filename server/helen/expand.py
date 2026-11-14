@@ -4,22 +4,34 @@ import urllib.error
 import urllib.request
 
 from helen import config
+from helen.morse import MORSE
 
-# Shortcuts: instant to say. The easiest are just a count of taps, at any speed:
-# 1 = yes, 2 = no, 3 = thank you, 4 = hello, 5 = please repeat.
-# (2 taps decode as I, or as T when they were quick enough to count as a dash.)
-QUICK = {
-    "E": "Yes.",
-    "I": "No.",
-    "T": "No.",
-    "S": "Thank you.",
-    "5": "Sorry, could you please repeat that?",
-    "Y": "Yes.",
-    "N": "No.",
-    "TY": "Thank you.",
-    "R": "Sorry, could you please repeat that?",
-    "H": "Hello! I'm deafblind, and I'm using this band to talk with you.",
+MORSE_CODE = {letter: code for code, letter in MORSE.items()}
+
+# Shortcuts by counting taps, at any speed (a quick pair that decoded as a dash counts as 2).
+# Only used when the message is a single letter.
+QUICK_COUNT = {
+    1: "Yes.",
+    2: "No.",
+    3: "Thank you.",
+    4: "Hello! I'm deafblind, and I'm using this band to talk with you.",
+    5: "Sorry, could you please repeat that?",
 }
+
+
+def tap_count(letter):
+    """How many taps a single letter took: a dot is 1 tap, a dash (quick pair) is 2."""
+    code = MORSE_CODE.get(letter.upper())
+    return sum(1 if s == "." else 2 for s in code) if code else None
+
+
+def quick(words):
+    """The quick phrase for a single tapped letter, or None."""
+    words = words.strip()
+    if len(words) == 1:
+        return QUICK_COUNT.get(tap_count(words))
+    return None
+
 
 PROMPT = """You are the voice of a deafblind, non-speaking person. They tap Morse code on a \
 wristband, which is slow and error-prone, so they send only key words, often with typos \
@@ -49,8 +61,8 @@ Tapped words: {words}"""
 
 def expand(words, history=""):
     words = words.strip().upper()
-    if words in QUICK:
-        return QUICK[words]
+    if quick(words):
+        return quick(words)
     answer = ask(PROMPT.format(words=words, history=history or "(none)"))
     return answer or words.capitalize() + "."   # no AI available: say the words as they are
 

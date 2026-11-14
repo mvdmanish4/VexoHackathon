@@ -9,7 +9,7 @@ import time
 from helen import phone
 from helen.band import connect
 from helen.compress import compress
-from helen.expand import QUICK, expand
+from helen.expand import expand, quick
 from helen.listen import Listener
 from helen.morse import encode
 from helen.taps import TapReader
@@ -34,7 +34,7 @@ def changed(event, text):
 
 def is_stray(words):
     """Only loose single letters that are not a quick phrase: accidental bumps, not a message."""
-    return words not in QUICK and all(len(w) == 1 for w in words.split())
+    return not quick(words) and all(len(w) == 1 for w in words.split())
 
 
 def sent(words):
