@@ -41,6 +41,10 @@ def is_stray(words):
 
 
 def sent(words):
+    words = " ".join(w.replace("?", "") for w in words.split()).strip()   # "?" = not a letter: noise
+    if not words:
+        log("--- ignored: only unreadable taps")
+        return
     if is_stray(words):
         log(f"--- ignored stray taps: {words}")
         return
