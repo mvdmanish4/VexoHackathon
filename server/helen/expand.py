@@ -5,8 +5,13 @@ import urllib.request
 
 from helen import config
 
-# One-letter shortcuts: hard to mistype, instant to say.
+# Shortcuts: instant to say. The easiest ones are just a count of taps
+# (E = 1 tap, I = 2, S = 3, H = 4, T = one quick double-tap).
 QUICK = {
+    "E": "Yes.",
+    "T": "No.",
+    "I": "Sorry, could you please repeat that?",
+    "S": "Thank you.",
     "Y": "Yes.",
     "N": "No.",
     "TY": "Thank you.",
