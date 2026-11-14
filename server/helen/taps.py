@@ -13,6 +13,8 @@ TURN_QUIET = 0.6       # seconds to ignore taps after a send (turning makes fake
 LETTER_GAP = 3.0       # pause that ends a letter: forgiving for slow, careful tapping
 WORD_GAP = 6.0         # pause that ends a word
 ADAPTIVE = False       # adapting shortened the pauses too much for careful tappers
+PAIR_WINDOW = 0.5      # two single taps this close together = a dash: the band often reports a
+                       # quick double-tap as two single taps instead of one "double-tap"
 # Send = wrist turned and held for 2 s (the band reports it as a "tilt"). A quick
 # orientation change is not used: the wrist moves that much while tapping.
 # No automatic send after silence: stray taps would get spoken.
@@ -35,12 +37,40 @@ class TapReader:
             on_delete=lambda: tell("delete", self.decoder.text),
             on_message=on_send)
         self.tell = tell
-        band.on("tap", lambda e: self._symbol(self.decoder.dot, "tap = ."))
-        band.on("double-tap", lambda e: self._symbol(self.decoder.dash, "double-tap = -"))
+        self.pending = None          # time of a single tap that may still become a dash
+        self.lock = threading.Lock()
+        band.on("tap", lambda e: self._tap())
+        band.on("double-tap", lambda e: self._double())
         band.on("tilt", lambda e: self._send())
         band.set_events(kinds=["tap", "double-tap", "tilt"], tap_threshold=TAP_THRESHOLD)
         band.configure(events=True)
         threading.Thread(target=self._clock, daemon=True).start()
+
+    def _tap(self):
+        now = time.monotonic()
+        with self.lock:
+            if self.pending is not None and now - self.pending <= PAIR_WINDOW:
+                self.pending = None
+                pair = True
+            else:
+                self.pending = now
+                pair = False
+        if pair:
+            self._symbol(self.decoder.dash, "two quick taps = -")
+
+    def _double(self):
+        with self.lock:
+            self.pending = None      # the band's own double-tap: any waiting tap was part of it
+        self._symbol(self.decoder.dash, "double-tap = -")
+
+    def _flush(self):
+        """A single tap with no partner within PAIR_WINDOW is a dot."""
+        with self.lock:
+            due = self.pending is not None and time.monotonic() - self.pending > PAIR_WINDOW
+            if due:
+                self.pending = None
+        if due:
+            self._symbol(self.decoder.dot, "tap = .")
 
     def _symbol(self, add, what):
         now = time.monotonic()
@@ -54,5 +84,6 @@ class TapReader:
 
     def _clock(self):
         while True:
+            self._flush()
             self.decoder.tick(time.monotonic())
             time.sleep(0.05)
