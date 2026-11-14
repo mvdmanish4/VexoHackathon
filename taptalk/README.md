@@ -24,11 +24,11 @@ No screen, no sight and no hearing needed: every control is a touch gesture.
 | Do this | Means |
 |---|---|
 | Tap once | dot `.` |
-| Double tap | dash `-` |
+| Double tap (two quick taps) | dash `-` |
 | Short pause (starts at 1.2 s) | end of the letter (the laptop softly says the letter) |
 | Longer pause (starts at 2.6 s) | space between words |
 | Six or more single taps in one letter | delete the last letter |
-| Turn the wrist over (palm up) | **send**: the message is spoken |
+| Turn the wrist over and hold it for half a second | **send**: the message is spoken |
 | Stay still (starts at 6 s) | send (fallback) |
 
 **The pauses adapt to the person.** After a few letters TapTalk measures how fast they tap
@@ -47,6 +47,24 @@ S ...   T -     U ..-   V ...-  W .--   X -..-  Y -.--  Z --..
 Short words work well because Gemini expands them: `WTR` (water), `PLS` (please),
 `THX` (thanks), `HLP` (help).
 
+## How taps are found
+
+The band has its own tap and double-tap detection, but its double-tap timing is fixed in the
+firmware and on real bands it often reports one double tap as two single taps. That turned
+dashes into dots and mixed up letters. So TapTalk reads the raw accelerometer instead, 833
+times a second, and finds the taps itself:
+
+- **A tap** is a sharp jolt that rises above `--tap-g` (default 1 g) over the slow average
+  and is gone within 50 ms. Arm swings and wrist turns are slow, so they are never taps, and
+  the ringing after a tap is ignored for 80 ms so one tap never counts twice.
+- **A dash** is two taps closer together than `--double-window` (default 0.30 s). A tap with
+  no partner in that time is a dot. `--calibrate` measures your own rhythm and sets it.
+- **Send** is the wrist turned more than 70 degrees away from where it rests while tapping,
+  held for half a second. It works however the band is worn: the resting direction is learnt
+  at every tap. A tap made by the start of the turn is dropped.
+
+`--detector band` goes back to the band's own events (and the `--send-face` orientation).
+
 ## Run it
 
 Python 3.9+ on a Mac (it speaks with `afplay` / `say`).
@@ -57,17 +75,21 @@ python3 -m pip install bleak certifi
 python3 -m unittest discover -s tests          # decoder tests, no band needed
 python3 taptalk.py --band N --sim              # pretend band taps "HELP ME" and sends it
 python3 taptalk.py --band N --sim --demo "WTR PLS"   # tap an abbreviation: Gemini expands it
+python3 taptalk.py --band N --sim --detector raw   # the same, played as raw accelerometer taps
+python3 taptalk.py --band N --calibrate        # real band, first time: learns your tap rhythm
 python3 taptalk.py --band N                    # your real band (double-tap it first)
 ```
 
 `N` is the number printed on your band's bag (band 7 is `Vexo-HACK-07`). The program only
 ever connects to that one band.
 
-Options: `--debug` prints every raw band event and the time from send to sound. `--no-ai` speaks the letters as tapped.
+Options: `--debug` prints every tap (strength and gap), what it became, movements that were
+not taps, and the time from send to sound. `--double-window` and `--tap-g` set the tap
+detector (use the numbers `--calibrate` prints). `--no-ai` speaks the letters as tapped.
 `--no-eleven` uses the Mac voice. `--letter-gap`, `--word-gap` and `--send-gap` change the
 starting pauses. `--fixed` keeps them fixed. `--no-speculate` turns off preparing the voice
-while tapping. `--tap-threshold` sets tap strength in g. `--send-face` sets the side that means
-"send". `--dedup` is explained below.
+while tapping. `--detector band` uses the band's own tap events; with it, `--tap-threshold`, `--send-face`
+(default `+z`) and `--dedup` apply.
 
 ## Sponsor keys (optional)
 
@@ -100,22 +122,26 @@ the fallback.
 
 ## First time with the real band: tune it
 
-1. Run `python3 taptalk.py --band N --debug`.
-2. **Double tap once.** If you see `tap` and then `double-tap`, the band sends an extra tap
-   for every double tap: run with `--dedup 0.3`.
-3. **Turn your wrist over.** Note the `face=` shown when your palm faces up. If it is not
-   `-z`, pass it as `--send-face`.
-4. If light taps are missed, lower `--tap-threshold` (for example 0.6). If arm movements count
-   as taps, raise it.
-5. Blindfold test: a teammate taps `... --- ...` with eyes closed, turns the wrist over, and
+1. Run `python3 taptalk.py --band N --calibrate`. The laptop asks for five single taps, then
+   five double taps, and prints the command to use, for example
+   `python3 taptalk.py --band N --double-window 0.32 --tap-g 0.9`.
+2. Run that command with `--debug`. Every tap prints its strength and the gap to the one
+   before, then `-> dot` or `-> dash`.
+   - Taps missed: lower `--tap-g` (for example 0.6).
+   - Arm moves count as taps: raise `--tap-g`.
+   - A double tap comes out as two dots: raise `--double-window` a little.
+   - Two dots come out as a dash: lower it, or tap dots a little slower.
+3. Turn the wrist over and hold it: `--debug` prints `send`.
+4. Blindfold test: a teammate taps `... --- ...` with eyes closed, turns the wrist over, and
    the laptop says "SOS".
 
 ## Files
 
-- `morse.py`: the tap decoder (pure logic, unit-tested)
+- `taps.py`: finds taps, dashes and the send turn in the raw accelerometer (pure logic, unit-tested)
+- `morse.py`: the Morse decoder (pure logic, unit-tested)
 - `sponsors.py`: Gemini and ElevenLabs, each with an offline fallback
 - `taptalk.py`: connects to the band, turns events into dots and dashes, speaks messages
-- `tests/test_morse.py`: decoder tests
+- `tests/`: decoder and tap detector tests
 - `vexo-open-kit/`: the official kit, unchanged (git-ignored; clone it here)
 
 ## Next

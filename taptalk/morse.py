@@ -42,12 +42,13 @@ class TapDecoder:
     """
 
     def __init__(self, letter_gap=1.2, word_gap=2.6, send_gap=6.0, dedup=0, adaptive=True,
-                 on_letter=None, on_delete=None, on_word=None, on_message=None):
+                 min_letter_gap=MIN_LETTER_GAP, on_letter=None, on_delete=None, on_word=None, on_message=None):
         self.letter_gap = letter_gap
         self.word_gap = word_gap
         self.send_gap = send_gap      # 0 or None = no automatic send
         self.dedup = dedup            # seconds; >0 drops a dot this soon before a dash (off by default)
         self.adaptive = adaptive
+        self.min_letter_gap = min_letter_gap   # adaptation never goes below this
         self.on_letter = on_letter
         self.on_delete = on_delete
         self.on_word = on_word
@@ -101,7 +102,7 @@ class TapDecoder:
             self._intra.append(gap)
             if len(self._intra) >= SAMPLES_NEEDED:
                 unit = statistics.median(self._intra)
-                self.letter_gap = min(MAX_LETTER_GAP, max(MIN_LETTER_GAP, 3 * unit))
+                self.letter_gap = min(MAX_LETTER_GAP, max(self.min_letter_gap, 3 * unit))
                 self.word_gap = WORD_FACTOR * self.letter_gap
                 if self.send_gap:
                     self.send_gap = max(MIN_SEND_GAP, SEND_FACTOR * self.letter_gap)
