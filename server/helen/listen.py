@@ -2,6 +2,7 @@
 
 Uses the Vexo kit's speech.py. Everything the band's mic hears goes to Deepgram while on.
 """
+import os
 import sys
 import threading
 import time
@@ -55,12 +56,18 @@ class Listener:
                 self.ogg = False
 
     def _health(self):
-        """Every 10 s: is sound arriving, how loud, and is Deepgram answering."""
+        """Every 10 s: is sound arriving, how loud, and is Deepgram answering.
+        No sound for 30 s means the band is gone: exit, and run.sh starts a fresh connection."""
+        silent = 0
         while True:
             time.sleep(10)
             self.log(f"mic: {self.packets} packets in 10s, loudness {self.level} dB below max, "
                      f"deepgram error: {getattr(self.ears, 'error', None)}, last partial: {self.partial!r}")
+            silent = silent + 1 if self.packets == 0 else 0
             self.packets = 0
+            if silent >= 3:
+                self.log("!!! no sound from the band for 30 s: restarting to reconnect (double-tap the band)")
+                os._exit(3)
 
     def mute(self, seconds):
         self.muted_until = max(self.muted_until, time.monotonic() + seconds)
