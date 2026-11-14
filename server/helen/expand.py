@@ -9,7 +9,7 @@ from helen.morse import MORSE
 MORSE_CODE = {letter: code for code, letter in MORSE.items()}
 
 # Shortcuts by counting taps, at any speed (a quick pair that decoded as a dash counts as 2).
-# Only used when the message is a single letter.
+# Used for very short messages (up to 3 letters, 5 taps in total), however the pauses fell.
 QUICK_COUNT = {
     1: "Yes.",
     2: "No.",
@@ -26,11 +26,14 @@ def tap_count(letter):
 
 
 def quick(words):
-    """The quick phrase for a single tapped letter, or None."""
-    words = words.strip()
-    if len(words) == 1:
-        return QUICK_COUNT.get(tap_count(words))
-    return None
+    """The quick phrase for a very short tapped message (counted in taps), or None."""
+    letters = words.replace(" ", "").strip()
+    if not 1 <= len(letters) <= 3:
+        return None
+    counts = [tap_count(c) for c in letters]
+    if None in counts:
+        return None
+    return QUICK_COUNT.get(sum(counts))
 
 
 PROMPT = """You are the voice of a deafblind, non-speaking person. They tap Morse code on a \
