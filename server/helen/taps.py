@@ -42,6 +42,7 @@ class TapReader:
             on_message=on_send)
         self.tell = tell
         self.pending = None          # time of a single tap that may still become a dash
+        self.last_pair = 0.0         # time we made a dash from two single taps
         self.lock = threading.Lock()
         band.on("tap", lambda e: self._tap())
         band.on("double-tap", lambda e: self._double())
@@ -64,9 +65,12 @@ class TapReader:
                 self.pending = now
                 pair = False
         if pair:
+            self.last_pair = now
             self._symbol(self.decoder.dash, "two quick taps = -")
 
     def _double(self):
+        if time.monotonic() - self.last_pair < 0.8:
+            return                   # the band also reported the pair we already made a dash from
         with self.lock:
             dot_first = self.pending is not None   # a single tap just before is its own dot
             self.pending = None
