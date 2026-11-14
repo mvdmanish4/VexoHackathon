@@ -8,7 +8,7 @@ import time
 
 from helen.morse import TapDecoder
 
-TAP_THRESHOLD = 0.5    # g; lower = more sensitive (band default 0.8 missed taps)
+TAP_THRESHOLD = 0.35   # g; lower = more sensitive (0.8 and 0.5 both missed real taps)
 TURN_QUIET = 0.6       # seconds to ignore taps after a send (turning makes fake taps)
 TURN_TAIL = 2.0        # a tap this soon before a send came from turning the wrist: drop it
 LETTER_GAP = 3.0       # pause that ends a letter: forgiving for slow, careful tapping

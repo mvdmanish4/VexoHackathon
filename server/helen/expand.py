@@ -5,13 +5,15 @@ import urllib.request
 
 from helen import config
 
-# Shortcuts: instant to say. The easiest ones are just a count of taps
-# (E = 1 tap, I = 2, S = 3, H = 4, T = one quick double-tap).
+# Shortcuts: instant to say. The easiest are just a count of taps, at any speed:
+# 1 = yes, 2 = no, 3 = thank you, 4 = hello, 5 = please repeat.
+# (2 taps decode as I, or as T when they were quick enough to count as a dash.)
 QUICK = {
     "E": "Yes.",
+    "I": "No.",
     "T": "No.",
-    "I": "Sorry, could you please repeat that?",
     "S": "Thank you.",
+    "5": "Sorry, could you please repeat that?",
     "Y": "Yes.",
     "N": "No.",
     "TY": "Thank you.",

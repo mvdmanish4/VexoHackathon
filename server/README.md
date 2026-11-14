@@ -20,8 +20,8 @@ Runs on the laptop. Connects to the Vexo band over Bluetooth and does the thinki
 | 6+ single taps in one letter | delete the last letter |
 | Turn the wrist over and hold 2 s | **send**: the message is spoken |
 
-Quick phrases (then send): 1 tap (`E`) yes, quick double-tap (`T`) no, 2 taps (`I`) please repeat,
-3 taps (`S`) thank you, 4 taps (`H`) hello + introduction. Also `Y` yes, `N` no, `TY` thank you, `R` repeat,
+Quick phrases by counting taps (any speed), then send: 1 yes, 2 no, 3 thank you, 4 hello +
+introduction, 5 please repeat. Also `Y` yes, `N` no, `TY` thank you, `R` repeat,
 `H` hello + introduction.
 
 ## Files
