@@ -75,10 +75,9 @@ class TapReader:
         if time.monotonic() - self.last_pair < 0.8:
             return                   # the band also reported the pair we already made a dash from
         with self.lock:
-            dot_first = self.pending is not None   # a single tap just before is its own dot
+            # A single tap still waiting (under PAIR_WINDOW old) is the first tap of this same
+            # double-tap: the band sometimes reports both. Count the pair once.
             self.pending = None
-        if dot_first:
-            self._symbol(self.decoder.dot, "tap = .")
         self._symbol(self.decoder.dash, "double-tap = -")
 
     def _flush(self):
