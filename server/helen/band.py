@@ -17,7 +17,7 @@ def connect(number=None, sim=False):
     while True:
         print("Looking for the band... double-tap it (light blinks blue).", flush=True)
         try:
-            return Band.connect(number)
+            return Band.connect(number, auto_reconnect=True, reconnect_seconds=3600)
         except VexoError as e:
             if e.code != "not-found-nearby":
                 raise

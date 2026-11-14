@@ -44,6 +44,7 @@ def say(words):
 band = connect(args.number, args.sim)
 log(f"Connected to {band.name}")
 band.on("disconnect", lambda e: log(f"!!! band disconnected: {getattr(e, 'reason', e)}"))
+band.on("reconnecting", lambda e: log("!!! band connection lost, reconnecting (double-tap the band if it takes long)"))
 band.on("reconnected", lambda e: log("!!! band reconnected"))
 TapReader(band, sent, changed)
 log("Ready: tap Morse, turn wrist over and hold 2s to speak. Ctrl+C to stop.")
