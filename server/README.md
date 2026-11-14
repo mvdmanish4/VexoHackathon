@@ -31,7 +31,7 @@ Quick phrases (one letter, then send): `Y` yes, `N` no, `TY` thank you, `R` plea
 | `helen/band.py` | Connect to the band, retry, auto-reconnect |
 | `helen/taps.py` | Band gestures to Morse symbols, send gesture |
 | `helen/morse.py` | Morse decoder with adaptive pauses and delete (pure logic, tested) |
-| `helen/expand.py` | AI: short tapped words to a natural sentence (Gemini 4, falls back to OpenAI) |
+| `helen/expand.py` | AI: short tapped words to a natural sentence (OpenAI, falls back to Gemini 4) |
 | `helen/voice.py` | ElevenLabs voice, falls back to the Mac voice |
 | `helen/config.py` | Reads keys from `.env` |
 | `tools/` | Debug helpers: `tap_probe` (raw events), `tap_to_text` (decode without speaking) |

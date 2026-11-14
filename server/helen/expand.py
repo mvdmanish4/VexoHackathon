@@ -52,8 +52,8 @@ _refused = set()   # services that refused the key (no credits, bad key): skip f
 
 
 def ask(prompt):
-    """Answer from the first AI that works (Gemini, then OpenAI), or None if none does."""
-    for key, service in (("GEMINI_API_KEY", _gemini), ("OPENAI_API_KEY", _openai)):
+    """Answer from the first AI that works (OpenAI, then Gemini), or None if none does."""
+    for key, service in (("OPENAI_API_KEY", _openai), ("GEMINI_API_KEY", _gemini)):
         if config.get(key) and key not in _refused:
             try:
                 return service(prompt)

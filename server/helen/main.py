@@ -6,13 +6,14 @@ import argparse
 import threading
 import time
 
+from helen import phone
 from helen.band import connect
 from helen.compress import compress
 from helen.expand import QUICK, expand
 from helen.listen import Listener
 from helen.morse import encode
 from helen.taps import TapReader
-from helen.voice import speak
+from helen.voice import speak, synthesize
 
 parser = argparse.ArgumentParser()
 parser.add_argument("number", nargs="?", type=int, default=None)
@@ -49,6 +50,9 @@ def say(words):
         sentence = expand(words, "\n".join(history[-6:]))
         log(f"<<< SAYING: {sentence}")
         history.append("Me: " + sentence)
+        if phone.phones():
+            say_on_phone(sentence)
+            return
         if listener:
             listener.mute(30)            # don't transcribe our own voice
         speak(sentence)
@@ -58,8 +62,24 @@ def say(words):
         log(f"!!! could not speak: {e}")
 
 
+def say_on_phone(sentence):
+    """Play the voice on the phone (falls back to showing the text if ElevenLabs fails)."""
+    try:
+        mp3 = synthesize(sentence)
+    except Exception as e:
+        log(f"!!! ElevenLabs failed ({e}), phone shows text only; laptop speaks")
+        phone.send({"type": "say", "text": sentence})
+        speak(sentence)
+        return
+    if listener:
+        listener.mute(len(mp3) / 16000 + 1.5)   # 128 kbit/s mp3 = 16 kB per second
+    phone.send({"type": "say", "text": sentence, "audio": phone.add_audio(mp3)})
+    log("    (voice sent to the phone)")
+
+
 def heard(sentence):
     log(f"((( HEARD: {sentence}")
+    phone.send({"type": "heard", "text": sentence})
     history.append("Them: " + sentence)
     threading.Thread(target=feel, args=(sentence,), daemon=True).start()
 
@@ -68,10 +88,13 @@ def feel(sentence):
     try:
         words = compress(sentence)
         log(f"~~~ FEEL: {words}   {encode(words)}")
+        phone.send({"type": "feel", "words": words, "morse": encode(words)})
     except Exception as e:
         log(f"!!! could not shorten: {e}")
 
 
+address = phone.start()
+log(f"PHONE: open {address} in Safari on the iPhone (same Wi-Fi as this laptop)")
 band = connect(args.number, args.sim)
 log(f"Connected to {band.name}")
 band.on("disconnect", lambda e: log(f"!!! band disconnected: {getattr(e, 'reason', e)}"))
