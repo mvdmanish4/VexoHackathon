@@ -10,6 +10,7 @@ from helen.morse import TapDecoder
 
 TAP_THRESHOLD = 0.5    # g; lower = more sensitive (band default 0.8 missed taps)
 TURN_QUIET = 0.6       # seconds to ignore taps after a send (turning makes fake taps)
+TURN_TAIL = 2.0        # a tap this soon before a send came from turning the wrist: drop it
 LETTER_GAP = 3.0       # pause that ends a letter: forgiving for slow, careful tapping
 WORD_GAP = 6.0         # pause that ends a word
 ADAPTIVE = False       # adapting shortened the pauses too much for careful tappers
@@ -104,8 +105,16 @@ class TapReader:
             self.tell("band", f"wrist moved (face {self.face}, z {self.az:+.2f} g), not palm-up: no send")
 
     def _send(self):
-        self.last_turn = time.monotonic()
-        self.decoder.request_send()
+        now = time.monotonic()
+        self.last_turn = now
+        with self.lock:
+            self.pending = None          # a waiting tap at this moment is the turn itself
+        dec = self.decoder
+        with dec._lock:
+            if dec.current and dec._last is not None and now - dec._last < TURN_TAIL:
+                dec.current = dec.current[:-1]
+                self.tell("band", "dropped the last tap: it came from turning the wrist")
+        dec.request_send()
 
     def _clock(self):
         while True:
