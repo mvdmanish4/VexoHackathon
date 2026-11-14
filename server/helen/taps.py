@@ -14,7 +14,7 @@ TURN_TAIL = 2.0        # a tap this soon before a send came from turning the wri
 LETTER_GAP = 3.0       # pause that ends a letter: forgiving for slow, careful tapping
 WORD_GAP = 6.0         # pause that ends a word
 ADAPTIVE = False       # adapting shortened the pauses too much for careful tappers
-PAIR_WINDOW = 0.5      # two single taps this close together = a dash: the band often reports a
+PAIR_WINDOW = 0.8      # two single taps this close together = a dash: the band often reports a
                        # quick double-tap as two single taps instead of one "double-tap"
 # Send = wrist turned palm-up AND held for 2 s (the band reports the hold as a "tilt").
 # A tilt alone is not enough (the wrist moves while tapping), and a quick turn to palm-up
