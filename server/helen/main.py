@@ -5,7 +5,7 @@ import threading
 import time
 
 from helen.band import connect
-from helen.expand import expand
+from helen.expand import QUICK, expand
 from helen.taps import TapReader
 from helen.voice import speak
 
@@ -26,7 +26,15 @@ def changed(event, d):
         log(f"  [{event:<6}] text: {d.text()}")
 
 
+def is_stray(words):
+    """Only loose single letters that are not a quick phrase: accidental bumps, not a message."""
+    return words not in QUICK and all(len(w) == 1 for w in words.split())
+
+
 def sent(words):
+    if is_stray(words):
+        log(f"--- ignored stray taps: {words}")
+        return
     log(f">>> TAPPED: {words}")
     threading.Thread(target=say, args=(words,), daemon=True).start()
 
