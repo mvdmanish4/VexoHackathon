@@ -112,7 +112,9 @@ class TapReader:
             self.pending = None          # a waiting tap at this moment is the turn itself
         dec = self.decoder
         with dec._lock:
-            if dec.current and dec._last is not None and now - dec._last < TURN_TAIL:
+            # Only when something else was tapped first: a lone tap is the message itself.
+            if (dec.current and dec._last is not None and now - dec._last < TURN_TAIL
+                    and (len(dec.current) > 1 or dec.text.strip())):
                 dec.current = dec.current[:-1]
                 self.tell("band", "dropped the last tap: it came from turning the wrist")
         dec.request_send()
