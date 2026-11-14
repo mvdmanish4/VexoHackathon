@@ -25,7 +25,10 @@ listener = None
 
 
 def log(line):
-    print(time.strftime("%H:%M:%S"), line, flush=True)
+    stamped = f"{time.strftime('%H:%M:%S')} {line}"
+    print(stamped, flush=True)
+    if not line.startswith("mic:"):              # the 10-second mic health lines are just noise there
+        phone.send({"type": "log", "line": stamped})
 
 
 def changed(event, text):
