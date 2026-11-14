@@ -21,9 +21,8 @@ def log(line):
     print(time.strftime("%H:%M:%S"), line, flush=True)
 
 
-def changed(event, d):
-    if event != "symbol":
-        log(f"  [{event:<6}] text: {d.text()}")
+def changed(event, text):
+    log(f"  [{event:<6}] text: {text}")
 
 
 def is_stray(words):

@@ -2,9 +2,39 @@
 
 Runs on the laptop. Connects to the Vexo band over Bluetooth and does the thinking.
 
+```sh
+./setup.sh                                  # once: Vexo kit + Python env + .env
+.venv/bin/python -m helen.main 46           # run with your band number
+.venv/bin/python -m helen.main --sim        # pretend band
+.venv/bin/python -m unittest discover tests # decoder tests, no band needed
+```
+
+## Tap language
+
+| Do this | Means |
+|---|---|
+| Tap once | dot `.` |
+| Double-tap | dash `-` |
+| Pause (starts at 2 s, adapts to your speed) | end of letter |
+| Longer pause (starts at 4.5 s) | end of word |
+| 6+ single taps in one letter | delete the last letter |
+| Turn the wrist over and hold 2 s | **send**: the message is spoken |
+
+Quick phrases (one letter, then send): `Y` yes, `N` no, `T` thank you, `R` please repeat,
+`H` hello + introduction.
+
+## Files
+
 | File | Job |
 |---|---|
-| `helen/band.py` | Connect to the band (real or pretend) |
-| `tools/tap_probe.py` | Print every tap/gesture with timing, for tuning |
+| `helen/main.py` | The server: taps in, voice out |
+| `helen/band.py` | Connect to the band, retry, auto-reconnect |
+| `helen/taps.py` | Band gestures to Morse symbols, send gesture |
+| `helen/morse.py` | Morse decoder with adaptive pauses and delete (pure logic, tested) |
+| `helen/expand.py` | AI: short tapped words to a natural sentence (Gemini 4, falls back to OpenAI) |
+| `helen/voice.py` | ElevenLabs voice, falls back to the Mac voice |
+| `helen/config.py` | Reads keys from `.env` |
+| `tools/` | Debug helpers: `tap_probe` (raw events), `tap_to_text` (decode without speaking) |
+| `tests/` | Decoder tests |
 
-Setup: `./setup.sh`, then put your keys in `.env` (see `.env.example`).
+Keys go in `.env` (see `.env.example`), never in git.

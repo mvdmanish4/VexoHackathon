@@ -2,8 +2,8 @@ import sys
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from morse import TapDecoder, encode  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # server/
+from helen.morse import TapDecoder, encode  # noqa: E402
 
 
 def taps(dec, pattern, start=0.0, step=0.4):

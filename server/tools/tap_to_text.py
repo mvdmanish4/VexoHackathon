@@ -20,8 +20,8 @@ def log(line):
     print(time.strftime("%H:%M:%S"), line, flush=True)
 
 
-def changed(event, d):
-    log(f"  [{event:<6}] {d.symbols or ' ':<6} text: {d.text()}")
+def changed(event, text):
+    log(f"  [{event:<6}] text: {text}")
 
 
 def sent(message):
