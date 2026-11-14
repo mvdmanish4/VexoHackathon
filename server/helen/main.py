@@ -79,7 +79,7 @@ band.on("reconnecting", lambda e: log("!!! band connection lost, reconnecting (d
 band.on("reconnected", lambda e: log("!!! band reconnected"))
 TapReader(band, sent, changed)
 try:
-    listener = Listener(band, heard)
+    listener = Listener(band, heard, log)
     log("Listening: the band's mic is on (blue light), speech goes to Deepgram.")
 except Exception as e:
     log(f"!!! not listening (taps still work): {e}")

@@ -9,7 +9,7 @@ from helen import config
 QUICK = {
     "Y": "Yes.",
     "N": "No.",
-    "T": "Thank you.",
+    "TY": "Thank you.",
     "R": "Sorry, could you please repeat that?",
     "H": "Hello! I'm deafblind, and I'm using this band to talk with you.",
 }
@@ -48,13 +48,18 @@ def expand(words, history=""):
     return answer or words.capitalize() + "."   # no AI available: say the words as they are
 
 
+_refused = set()   # services that refused the key (no credits, bad key): skip for this run
+
+
 def ask(prompt):
     """Answer from the first AI that works (Gemini, then OpenAI), or None if none does."""
     for key, service in (("GEMINI_API_KEY", _gemini), ("OPENAI_API_KEY", _openai)):
-        if config.get(key):
+        if config.get(key) and key not in _refused:
             try:
                 return service(prompt)
             except Exception as e:   # out of credits, network, ...: try the next service
+                if getattr(e, "code", None) in (401, 402, 403):
+                    _refused.add(key)
                 print(f"!!! {key.split('_')[0]} failed ({e}), trying the next AI", flush=True)
     return None
 
