@@ -11,6 +11,8 @@ from helen.morse import TapDecoder
 TAP_THRESHOLD = 0.45   # g; lower = more sensitive (0.8 missed real taps, 0.35 caught arm movement)
 TURN_QUIET = 2.5       # seconds to ignore taps after a send (turning back makes fake taps)
 TURN_TAIL = 2.0        # a tap this soon before a send came from turning the wrist: drop it
+STALE = 10.0           # taps not sent within this many seconds are cleared, so they can't
+                       # merge into the next answer
 LETTER_GAP = 3.0       # pause that ends a letter: forgiving for slow, careful tapping
 WORD_GAP = 6.0         # pause that ends a word
 ADAPTIVE = False       # adapting shortened the pauses too much for careful tappers
@@ -118,8 +120,20 @@ class TapReader:
                 self.tell("band", "dropped the last tap: it came from turning the wrist")
         dec.request_send()
 
+    def _clear_stale(self):
+        dec = self.decoder
+        with dec._lock:
+            stale = (dec._last is not None and (dec.text.strip() or dec.current)
+                     and time.monotonic() - dec._last > STALE)
+            if stale:
+                dropped = (dec.text + dec.current).strip()
+                dec.text, dec.current, dec._last = "", "", None
+        if stale:
+            self.tell("band", f"cleared unsent taps ({dropped}): nothing was sent for {STALE:.0f} s")
+
     def _clock(self):
         while True:
             self._flush()
+            self._clear_stale()
             self.decoder.tick(time.monotonic())
             time.sleep(0.05)
