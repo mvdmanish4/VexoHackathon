@@ -193,7 +193,7 @@ def heard(sentence):
         # dynamic conversation: buzz, 5-7 s pause, Sri's AI reply on the phone.
         threading.Thread(target=to_iphone, args=(sentence,), daemon=True).start()
         if len(sentence.split()) >= 3:
-            threading.Thread(target=phone_turn, args=(sentence,), daemon=True).start()
+            threading.Thread(target=phone_turn, args=(sentence, True), daemon=True).start()
         return
     threading.Thread(target=feel, args=(sentence,), daemon=True).start()
 
@@ -223,16 +223,25 @@ def spoke_into_phone(text):
     phone_turn(text)
 
 
-def phone_turn(text):
+def phone_turn(text, from_band=False):
     if script_step[0] == 0:
         log("--- press Start conversation first")
         return
     if not agent_lock.acquire(blocking=False):
         return                                    # Sri is still answering the last turn
     try:
-        reply = {}
-        worker = threading.Thread(target=lambda: reply.setdefault(
-            "text", agent.reply(text or "(they said something you did not catch)", history, always=True)))
+        if from_band:
+            # The band hears the whole room: only answer what was said to Sri.
+            answer = agent.reply(text, history, always=False)
+            if not answer:
+                log(f"--- not for Sri, no reply: {text}")
+                return
+            reply = {"text": answer}
+            worker = threading.Thread(target=lambda: None)
+        else:
+            reply = {}
+            worker = threading.Thread(target=lambda: reply.setdefault(
+                "text", agent.reply(text or "(they said something you did not catch)", history, always=True)))
         worker.start()                            # think while the phone buzzes and Sri "types"
         words = " ".join(sorted(re.findall(r"[A-Za-z0-9]+", text), key=len, reverse=True)[:2]).upper() or "HI"
         pulses = buzz.pattern(words, 2.0)
