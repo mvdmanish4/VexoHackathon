@@ -217,6 +217,7 @@ const talk = document.getElementById("talk");
 let micStream = null, audioCtx = null, analyser = null, recorder = null, chunks = [];
 let voiceTurn = 0;
 let listening = false, conversationOn = false, spoke = false, lastLoud = 0, turnStart = 0, floor = 0.01, levelTimer = null;
+let peak = 0, speechStart = 0;
 function showStatus(text, color) { talk.textContent = text; talk.style.background = color; }
 function debug(msg) { action("debug", msg); }
 
@@ -250,7 +251,7 @@ function level() {
 }
 function listen() {
   if (!conversationOn || listening || !micStream) return;
-  listening = true; spoke = false; chunks = []; turnStart = performance.now();
+  listening = true; spoke = false; chunks = []; turnStart = performance.now(); peak = 0; speechStart = 0;
   try {
     recorder = new MediaRecorder(micStream);
     recorder.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
@@ -263,11 +264,16 @@ function listen() {
   levelTimer = setInterval(() => {
     const l = level(), now = performance.now();
     if (now - turnStart < 600) { samples.push(l); floor = Math.max(0.004, samples.reduce((a, b) => a + b, 0) / samples.length); return; }
-    if (l > floor * 2.5 + 0.008) {
+    // "Talking" = clearly above the room's noise AND near this speaker's own loudness, so a
+    // noisy room still counts as a pause once the speaker stops.
+    if (spoke) peak = Math.max(peak * 0.995, l);
+    const loud = l > floor * 2.5 + 0.008 && (!spoke || l > peak * 0.35);
+    if (loud) {
       lastLoud = now;
-      if (!spoke) { spoke = true; showStatus("🎤 Hearing you…", "#2b5ea8"); }
+      if (!spoke) { spoke = true; speechStart = now; peak = l; showStatus("🎤 Hearing you… (tap when done)", "#2b5ea8"); }
     }
-    if (spoke && now - lastLoud > 1500) finish();             // 1.5 s quiet after speech: done
+    if (spoke && now - lastLoud > 1200) finish();             // 1.2 s pause after speech: done
+    if (spoke && now - speechStart > 8000) finish();          // at most 8 s per turn
     if (now - turnStart > 25000) finish();                    // safety: never record forever
   }, 100);
 }
