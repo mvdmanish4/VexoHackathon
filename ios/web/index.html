@@ -186,8 +186,9 @@ function connect() {
       addLine("me", ev.text);
       if (ev.audio) {
         stopListening();
+        releaseMic();
         showStatus("🔊 Sri is speaking…", "#2e7d4f");
-        playVoice(ev.audio, () => setTimeout(listen, 400));
+        playVoice(ev.audio, async () => { if (conversationOn && await openMic()) setTimeout(listen, 300); });
       }
     }
   };
@@ -204,46 +205,90 @@ document.getElementById("start").onclick = () => {
 };
 function action(name, body) { fetch("/action/" + name, { method: "POST", body: body || "" }).catch(() => {}); }
 
-// ---- Hands-free conversation: the phone listens, notices the pause, and sends ------------
-// Listening stops while Sri talks (so the phone doesn't hear her) and starts again when she
-// is done. Tapping the big button while listening sends straight away.
+// ---- Hands-free conversation through the phone's microphone ------------------------------
+// The mic is opened once, on the Start tap (iOS only allows it from a tap). Each turn is
+// recorded; when the sound level drops for 1.5 s after speech, the recording goes to the
+// laptop, which transcribes it (Deepgram) and lets Sri answer. While Sri talks we don't record.
 const talk = document.getElementById("talk");
-const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-let rec = null, said = "", listening = false, conversationOn = false, silence = null;
+let micStream = null, audioCtx = null, analyser = null, recorder = null, chunks = [];
+let listening = false, conversationOn = false, spoke = false, lastLoud = 0, turnStart = 0, floor = 0.01, levelTimer = null;
 function showStatus(text, color) { talk.textContent = text; talk.style.background = color; }
-function listen() {
-  if (!conversationOn || listening) return;
-  listening = true; said = "";
-  showStatus("🎤 Listening… (speak now)", "#2b5ea8");
-  if (!Recognition) { showStatus("🎤 This browser can't listen: tap here when they finish", "#2b5ea8"); return; }
+function debug(msg) { action("debug", msg); }
+
+async function openMic() {
+  if (micStream) return true;
   try {
-    rec = new Recognition(); rec.lang = "en-US"; rec.interimResults = true; rec.continuous = true;
-    rec.onresult = ev => {
-      said = Array.from(ev.results).map(r => r[0].transcript).join(" ").trim();
-      showStatus("🎤 " + said, "#2b5ea8");
-      clearTimeout(silence);
-      silence = setTimeout(finish, 1600);            // 1.6 s with no new words = they finished
-    };
-    rec.onend = () => { if (listening) { try { rec.start(); } catch (e) {} } };   // iOS stops on silence: keep going
-    rec.onerror = () => {};
-    rec.start();
-  } catch (e) { rec = null; }
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+    if (!audioCtx) { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+    try { await audioCtx.resume(); } catch (e) {}
+    analyser = audioCtx.createAnalyser(); analyser.fftSize = 1024;
+    audioCtx.createMediaStreamSource(micStream).connect(analyser);
+    debug("mic open");
+    return true;
+  } catch (e) {
+    showStatus("⚠️ Microphone blocked: allow it in Safari (aA → Website Settings → Microphone)", "#a82b2b");
+    debug("mic blocked: " + e.name + " " + e.message);
+    return false;
+  }
+}
+// Close the mic while Sri talks: with the mic open, iPhones play sound through the quiet earpiece.
+function releaseMic() {
+  if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+}
+function level() {
+  const buf = new Float32Array(analyser.fftSize);
+  analyser.getFloatTimeDomainData(buf);
+  let sum = 0; for (const v of buf) sum += v * v;
+  return Math.sqrt(sum / buf.length);
+}
+function listen() {
+  if (!conversationOn || listening || !micStream) return;
+  listening = true; spoke = false; chunks = []; turnStart = performance.now();
+  try {
+    recorder = new MediaRecorder(micStream);
+    recorder.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+    recorder.onstop = sendTurn;
+    recorder.start(250);
+  } catch (e) { debug("recorder failed: " + e.message); listening = false; return; }
+  showStatus("🎤 Listening… (speak now)", "#2b5ea8");
+  // learn the room's background level for the first 0.6 s, then watch for speech and the pause
+  const samples = [];
+  levelTimer = setInterval(() => {
+    const l = level(), now = performance.now();
+    if (now - turnStart < 600) { samples.push(l); floor = Math.max(0.004, samples.reduce((a, b) => a + b, 0) / samples.length); return; }
+    if (l > floor * 2.5 + 0.008) {
+      lastLoud = now;
+      if (!spoke) { spoke = true; showStatus("🎤 Hearing you…", "#2b5ea8"); }
+    }
+    if (spoke && now - lastLoud > 1500) finish();             // 1.5 s quiet after speech: done
+    if (now - turnStart > 25000) finish();                    // safety: never record forever
+  }, 100);
 }
 function stopListening() {
-  listening = false; clearTimeout(silence);
-  if (rec) { rec.onend = null; try { rec.stop(); } catch (e) {} rec = null; }
+  clearInterval(levelTimer);
+  listening = false;
+  if (recorder && recorder.state !== "inactive") { recorder.onstop = null; recorder.stop(); }
+  recorder = null;
 }
 function finish() {
   if (!listening) return;
-  const text = said.trim();
-  stopListening();
+  clearInterval(levelTimer);
+  listening = false;
   showStatus("📳 Sri is feeling it…", "#6b4fa8");
-  action("spoke", text);
+  if (recorder && recorder.state !== "inactive") recorder.stop(); else sendTurn();
+}
+function sendTurn() {
+  const blob = new Blob(chunks, { type: (recorder && recorder.mimeType) || "audio/mp4" });
+  recorder = null;
+  fetch("/action/audio", { method: "POST", headers: { "Content-Type": blob.type || "audio/mp4" }, body: blob }).catch(() => {});
 }
 talk.addEventListener("click", () => { if (listening) finish(); });
 
-document.getElementById("startConv").onclick = () => { conversationOn = true; stopListening(); showStatus("🔊 Sri is speaking…", "#2e7d4f"); action("start"); };
-document.getElementById("resetConv").onclick = () => { conversationOn = false; stopListening(); showStatus("Press ▶ Start conversation", "#3a3f47"); action("reset"); };
+document.getElementById("startConv").onclick = async () => {
+  if (!(await openMic())) return;
+  conversationOn = true; stopListening(); showStatus("🔊 Sri is speaking…", "#2e7d4f"); action("start");
+};
+document.getElementById("resetConv").onclick = () => { conversationOn = false; stopListening(); releaseMic(); showStatus("Press ▶ Start conversation", "#3a3f47"); action("reset"); };
 document.getElementById("replay").onclick = () => lastMorse && playMorse(lastMorse);
 document.getElementById("test").onclick = () => playMorse("... --- ...");
 </script>

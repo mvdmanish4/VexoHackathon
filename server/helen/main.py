@@ -3,6 +3,8 @@
 #   someone speaks -> band mic -> Deepgram -> AI shortens -> Morse to feel
 #   .venv/bin/python -m helen.main 46
 import argparse
+import json
+import urllib.request
 import random
 import re
 import threading
@@ -223,6 +225,26 @@ def spoke_into_phone(text):
     phone_turn(text)
 
 
+def phone_audio(data, kind):
+    """The phone recorded the person's turn: transcribe it with Deepgram, then carry on."""
+    try:
+        req = urllib.request.Request(
+            "https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true&language=en",
+            data, {"Authorization": "Token " + config.get("DEEPGRAM_API_KEY", ""),
+                   "Content-Type": kind.split(";")[0] or "audio/mp4"})
+        with urllib.request.urlopen(req, timeout=20) as r:
+            result = json.load(r)
+        text = result["results"]["channels"][0]["alternatives"][0]["transcript"].strip()
+    except Exception as e:
+        log(f"!!! could not transcribe the phone recording ({len(data)} bytes): {e}")
+        text = ""
+    spoke_into_phone(text)
+
+
+def phone_debug(message):
+    log(f"    phone: {message}")
+
+
 def phone_turn(text, from_band=False):
     if script_step[0] == 0:
         log("--- press Start conversation first")
@@ -297,6 +319,8 @@ def feel(sentence):
 phone.on_action("start", start_conversation)
 phone.on_action("reset", reset_conversation)
 phone.on_action("spoke", spoke_into_phone)
+phone.on_action("audio", phone_audio)
+phone.on_action("debug", phone_debug)
 address = phone.start()
 log(f"PHONE: open {address} in Safari on the iPhone (same Wi-Fi as this laptop)")
 band = connect(args.number, args.sim)

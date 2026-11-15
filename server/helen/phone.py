@@ -70,8 +70,13 @@ class Handler(BaseHTTPRequestHandler):
         name = self.path.rstrip("/").split("/")[-1]
         if self.path.startswith("/action/") and name in _actions:
             length = int(self.headers.get("Content-Length") or 0)
-            text = self.rfile.read(length).decode("utf-8", "replace").strip() if length else ""
-            args = (text,) if name == "spoke" else ()
+            body = self.rfile.read(length) if length else b""
+            if name == "audio":              # a recording of the person, from the phone's mic
+                args = (body, self.headers.get("Content-Type", "audio/mp4"))
+            elif name in ("spoke", "debug"):
+                args = (body.decode("utf-8", "replace").strip(),)
+            else:
+                args = ()
             threading.Thread(target=_actions[name], args=args, daemon=True).start()
             return self._reply(200, "text/plain", b"ok")
         self._reply(404, "text/plain", b"not found")
