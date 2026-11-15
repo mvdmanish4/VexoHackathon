@@ -187,7 +187,10 @@ def heard(sentence):
     log(f"((( HEARD: {sentence}")
     last_band_heard[:] = [sentence, time.monotonic()]
     if VOICE_AGENT and PHONE_MIC:
-        return                       # the phone's hold-to-talk button drives the conversation
+        # The band hears the end of a sentence quickly even in a noisy room: tell the phone
+        # to stop recording and send its turn now (it ignores this unless it is listening).
+        phone.send({"type": "finish"})
+        return
     phone.send({"type": "heard", "text": sentence})
     history.append("Them: " + sentence)
     if VOICE_AGENT:

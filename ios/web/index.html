@@ -166,6 +166,7 @@ function connect() {
   events.onmessage = e => {
     const ev = JSON.parse(e.data);
     if (ev.type === "log") addLog(ev.line);
+    if (ev.type === "finish" && listening && spoke) finish();   // the band heard the sentence end
     if (ev.type === "reset") {
       log.innerHTML = "";
       document.getElementById("words").innerHTML = "&nbsp;";
