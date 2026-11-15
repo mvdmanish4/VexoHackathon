@@ -333,6 +333,17 @@ phone.on_action("audio", phone_audio)
 phone.on_action("debug", phone_debug)
 address = phone.start()
 log(f"PHONE: open {address} in Safari on the iPhone (same Wi-Fi as this laptop)")
+if IGNORE_BAND:
+    # Phone-only demo: don't connect to the band at all; the phone page does everything.
+    log("PHONE ONLY: not connecting to the band (IGNORE_BAND=1)")
+    if VOICE_AGENT:
+        log(f"VOICE AGENT ON: phone mic -> Shri replies on the phone, pause {config.get('REPLY_PAUSE', '5-7')} s")
+    try:
+        while True:
+            time.sleep(3600)
+    except KeyboardInterrupt:
+        pass
+    raise SystemExit
 band = connect(args.number, args.sim)
 log(f"Connected to {band.name}")
 band.on("disconnect", lambda e: log(f"!!! band disconnected: {getattr(e, 'reason', e)}"))
