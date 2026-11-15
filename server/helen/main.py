@@ -189,9 +189,12 @@ def heard(sentence):
     phone.send({"type": "heard", "text": sentence})
     history.append("Them: " + sentence)
     if VOICE_AGENT:
+        # Fallback when the phone can't listen (PHONE_MIC=0): the band's mic drives the same
+        # dynamic conversation: buzz, 5-7 s pause, Sri's AI reply on the phone.
         threading.Thread(target=to_iphone, args=(sentence,), daemon=True).start()
-        threading.Thread(target=agent_answer, args=(sentence,), daemon=True).start()
-        return                       # the buzz is sent by agent_answer, in step with Sri
+        if len(sentence.split()) >= 3:
+            threading.Thread(target=phone_turn, args=(sentence,), daemon=True).start()
+        return
     threading.Thread(target=feel, args=(sentence,), daemon=True).start()
 
 
