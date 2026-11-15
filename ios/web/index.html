@@ -46,6 +46,10 @@
 <div id="app" class="hidden" style="display:flex;flex-direction:column;flex:1;min-height:0">
   <div id="morse"><div id="words">&nbsp;</div><div id="code"></div></div>
   <div id="log"></div>
+  <div class="controls" style="margin-bottom:10px">
+    <button id="startConv" style="background:#2e7d4f">▶ Start conversation</button>
+    <button id="resetConv" style="background:#7a2e2e">↺ Reset</button>
+  </div>
   <div class="controls">
     <button id="replay">Replay</button>
     <button id="test">Test buzz</button>
@@ -161,6 +165,11 @@ function connect() {
   events.onmessage = e => {
     const ev = JSON.parse(e.data);
     if (ev.type === "log") addLog(ev.line);
+    if (ev.type === "reset") {
+      log.innerHTML = "";
+      document.getElementById("words").innerHTML = "&nbsp;";
+      document.getElementById("code").textContent = "";
+    }
     if (ev.type === "heard") addLine("them", ev.text);
     if (ev.type === "feel") {
       document.getElementById("words").textContent = ev.words.replace(/ Q$/, " ?");
@@ -188,6 +197,9 @@ document.getElementById("start").onclick = () => {
   document.getElementById("app").classList.remove("hidden");
   connect();
 };
+function action(name) { fetch("/action/" + name, { method: "POST" }).catch(() => {}); }
+document.getElementById("startConv").onclick = () => action("start");
+document.getElementById("resetConv").onclick = () => action("reset");
 document.getElementById("replay").onclick = () => lastMorse && playMorse(lastMorse);
 document.getElementById("test").onclick = () => playMorse("... --- ...");
 </script>

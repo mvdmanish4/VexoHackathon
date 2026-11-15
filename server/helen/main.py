@@ -80,6 +80,23 @@ def sent(words):
     threading.Thread(target=say, args=(words,), daemon=True).start()
 
 
+def start_conversation():
+    """Page button: Sri says her intro (line 1) and the script moves on from there."""
+    with agent_lock:
+        script_step[0] = 1
+    log(">>> START button: Sri's intro")
+    say_line(SCRIPT[0])
+
+
+def reset_conversation():
+    """Page button: back to the beginning, ready for the next take."""
+    with agent_lock:
+        script_step[0] = 0
+        history.clear()
+    log(">>> RESET button: script back to the start")
+    phone.send({"type": "reset"})
+
+
 def say_line(sentence):
     """Speak a fixed sentence (demo script). With a phone page open, the phone plays it
     (ElevenLabs voice); otherwise the laptop speaks."""
@@ -219,6 +236,8 @@ def feel(sentence):
         log(f"!!! could not shorten: {e}")
 
 
+phone.on_action("start", start_conversation)
+phone.on_action("reset", reset_conversation)
 address = phone.start()
 log(f"PHONE: open {address} in Safari on the iPhone (same Wi-Fi as this laptop)")
 band = connect(args.number, args.sim)

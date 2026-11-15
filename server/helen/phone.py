@@ -16,6 +16,7 @@ PAGE = Path(__file__).resolve().parent.parent.parent / "ios" / "web" / "index.ht
 PORT = 8765
 
 _clients = []          # one queue per open phone page
+_actions = {}          # name -> function, for the page's buttons (/action/start, /action/reset)
 _audio = {}            # id -> mp3 bytes (recent voice clips)
 _lock = threading.Lock()
 
@@ -35,6 +36,11 @@ def add_audio(mp3):
         for old in [k for k in _audio if k < n - 20]:
             del _audio[old]
     return f"/audio/{n}.mp3"
+
+
+def on_action(name, fn):
+    """Let a page button call `fn` (POST /action/<name>)."""
+    _actions[name] = fn
 
 
 def phones():
@@ -59,6 +65,13 @@ class Handler(BaseHTTPRequestHandler):
             self._events()
         else:
             self._reply(404, "text/plain", b"not found")
+
+    def do_POST(self):
+        name = self.path.rstrip("/").split("/")[-1]
+        if self.path.startswith("/action/") and name in _actions:
+            threading.Thread(target=_actions[name], daemon=True).start()
+            return self._reply(200, "text/plain", b"ok")
+        self._reply(404, "text/plain", b"not found")
 
     def _reply(self, code, kind, body):
         self.send_response(code)
