@@ -142,10 +142,10 @@ def is_echo(sentence):
 # Names speech-to-text gets wrong in our demo, and what they should be.
 NAME_FIXES = [
     (r"\b(five|5|pipe|pi?pe?)[ -]?cats?\b", "Pipecat"),
-    (r"\b(pipette|pipe it|pipe ?cut|pipe ?kat)\b", "Pipecat"),
-    (r"\b(11|eleven)[ -]?labs?\b", "ElevenLabs"),
+    (r"\b(pipette|pipe it|pipe ?cut|pipe ?kat|pipe ?guide|pipe ?gate)\b", "Pipecat"),
+    (r"\b(11|eleven|lemon|level)[ -]?labs?\b", "ElevenLabs"),
     (r"\bday[ -]?break\b", "Daybreak"),
-    (r"\b(shree|shri|sree)\b", "Sri"),
+    (r"\b(shree|shri|sree|sheena|sriya)\b", "Sri"),
 ]
 
 
