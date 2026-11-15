@@ -14,11 +14,16 @@ def connect(number=None, sim=False):
         return Band.connect(number or 42, transport="sim")
     if number is None:
         sys.exit("Give your band number (it is on the bag), e.g. 42")
+    from helen import config
+    usb = config.get("BAND_TRANSPORT", "ble") == "serial"   # USB cable: no Bluetooth drops, charges the band
     while True:
-        print("Looking for the band... double-tap it (light blinks blue).", flush=True)
+        print("Looking for the band on the USB cable..." if usb else
+              "Looking for the band... double-tap it (light blinks blue).", flush=True)
         try:
+            if usb:
+                return Band.connect(number, transport="serial", auto_reconnect=True, reconnect_seconds=3600)
             return Band.connect(number, auto_reconnect=True, reconnect_seconds=3600)
         except VexoError as e:
-            if e.code != "not-found-nearby":
+            if e.code not in ("not-found-nearby", "no-port"):
                 raise
             print("Not found yet, trying again.", flush=True)
