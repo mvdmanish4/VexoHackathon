@@ -9,7 +9,8 @@ import time
 from helen import phone
 from helen.band import connect
 from helen.compress import compress
-from helen.expand import expand, quick
+from helen import config
+from helen.expand import QUICK_COUNT, expand, quick
 from helen.listen import Listener
 from helen.morse import encode
 from helen.taps import TapReader
@@ -40,7 +41,21 @@ def is_stray(words):
     return not quick(words) and all(len(w) == 1 for w in words.split())
 
 
+# Demo mode (DEMO_SCRIPT=1 in .env): every send plays the next line of the script, whatever
+# was tapped, so the demo can't be thrown off by a misread tap. After the last line it
+# starts again.
+DEMO_SCRIPT = config.get("DEMO_SCRIPT", "0") == "1"
+SCRIPT = [QUICK_COUNT[n] for n in (1, 2, 3, 4)]
+script_step = [0]
+
+
 def sent(words):
+    if DEMO_SCRIPT:
+        line = SCRIPT[script_step[0] % len(SCRIPT)]
+        log(f">>> TAPPED: {words}   (demo script line {script_step[0] % len(SCRIPT) + 1})")
+        script_step[0] += 1
+        threading.Thread(target=say_line, args=(line,), daemon=True).start()
+        return
     words = " ".join(w.replace("?", "") for w in words.split()).strip()   # "?" = not a letter: noise
     if not words:
         log("--- ignored: only unreadable taps")
@@ -50,6 +65,21 @@ def sent(words):
         return
     log(f">>> TAPPED: {words}")
     threading.Thread(target=say, args=(words,), daemon=True).start()
+
+
+def say_line(sentence):
+    """Speak a fixed sentence (demo script), the same way say() does after the AI step."""
+    try:
+        log(f"<<< SAYING: {sentence}")
+        history.append("Me: " + sentence)
+        phone.send({"type": "say", "text": sentence})
+        if listener:
+            listener.mute(30)
+        speak(sentence)
+        if listener:
+            listener.muted_until = time.monotonic() + 3.0
+    except Exception as e:
+        log(f"!!! could not speak: {e}")
 
 
 def say(words):
@@ -129,6 +159,8 @@ try:
 except Exception as e:
     log(f"!!! not listening (taps still work): {e}")
 log("Ready: tap Morse, turn wrist over and hold 2s to speak. Ctrl+C to stop.")
+if DEMO_SCRIPT:
+    log("DEMO SCRIPT ON: each send plays the next line: " + " | ".join(SCRIPT))
 try:
     band.wait(4 * 3600)
 except KeyboardInterrupt:
