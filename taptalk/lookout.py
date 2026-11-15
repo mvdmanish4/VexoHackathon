@@ -35,7 +35,9 @@ import subprocess
 import tempfile
 import threading
 import time
+import os
 import urllib.error
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -108,6 +110,20 @@ def look(gemini, jpeg):
             return {"level": "unknown", "what": "Gemini not reachable"}
         style += 1
     return unknown
+
+
+def send_to_receiver(url, code, word):
+    """Hand the warning to the team's iPhone receiver app (ios/receiver-app), which plays it
+    as Morse through the iPhone's real haptics engine (Core Haptics). Returns True if taken."""
+    req = urllib.request.Request(
+        url.rstrip("/") + "/transcripts", method="POST",
+        data=json.dumps({"text": word, "compact": False}).encode(),
+        headers={"Content-Type": "application/json", "X-Vexo-Code": code or ""})
+    try:
+        with urllib.request.urlopen(req, timeout=3) as r:
+            return r.status == 200
+    except (urllib.error.URLError, OSError):
+        return False
 
 
 PAGE = r"""<!doctype html>
@@ -308,6 +324,10 @@ def main():
     p = argparse.ArgumentParser(description="Phone camera warns of a wall ahead by vibration.")
     p.add_argument("--port", type=int, default=8766)
     p.add_argument("--quiet", action="store_true", help="the laptop does not speak the warning")
+    p.add_argument("--receiver", default=os.environ.get("LOOKOUT_RECEIVER", ""),
+                   help="address of the team's iPhone receiver server, e.g. http://localhost:8765 : "
+                        "each new danger is sent there and the native iPhone app vibrates it in Morse "
+                        "(real haptics). Its code is read from VEXO_RECEIVER_CODE if needed")
     a = p.parse_args()
 
     gemini = Gemini()
@@ -351,6 +371,19 @@ def main():
                              and time.time() - last["spoke"] > 4)
                 if speak:
                     last["spoke"] = time.time()
+            if a.receiver and answer["level"] == "stop":
+                word = (answer["what"].split() or ["STOP"])[0].upper()
+                with lock:
+                    due = word != last.get("sent") or time.time() - last.get("sent_at", 0) > 12
+                    if due:
+                        last["sent"], last["sent_at"] = word, time.time()
+                if due:
+                    ok = send_to_receiver(a.receiver, os.environ.get("VEXO_RECEIVER_CODE", ""), word)
+                    print("    -> iPhone app: %s %s" % (word, "sent" if ok else "NOT sent (receiver unreachable)"),
+                          flush=True)
+            elif answer["level"] == "clear":
+                with lock:
+                    last["sent"] = None
             if speak:
                 what = answer["what"] if answer["what"] not in ("", "unclear") else "Obstacle"
                 voice.say("%s ahead" % what.capitalize())
@@ -369,6 +402,8 @@ def main():
     print("On the phone (same Wi-Fi) open:  https://%s:%d" % (address, a.port))
     print("The first time, the phone warns about the certificate: Show details -> visit this website.")
     print("Then press Start and allow the camera. Ctrl+C stops.")
+    if a.receiver:
+        print("Dangers are also sent to the iPhone receiver app at %s (real haptics, in Morse)." % a.receiver)
     print("On this laptop instead:  https://localhost:%d  (each tick buzzes the speakers and shakes the screen)\n" % a.port)
     try:
         server.serve_forever()
