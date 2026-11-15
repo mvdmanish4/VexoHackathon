@@ -48,6 +48,7 @@ def is_stray(words):
 # starts again.
 DEMO_SCRIPT = config.get("DEMO_SCRIPT", "0") == "1"
 VOICE_AGENT = config.get("VOICE_AGENT", "0") == "1"   # AI "Sri" answers whoever talks (helen/agent.py)
+PHONE_MIC = config.get("PHONE_MIC", "0") == "1"       # the person talks into the phone (hold-to-talk)
 agent_lock = threading.Lock()
 SCRIPT = [QUICK_COUNT[n] for n in (1, 2, 3, 4)]
 script_step = [0]
@@ -184,6 +185,8 @@ def heard(sentence):
     log(f"((( HEARD: {sentence}")
     phone.send({"type": "heard", "text": sentence})
     history.append("Them: " + sentence)
+    if VOICE_AGENT and PHONE_MIC:
+        return                       # the phone's hold-to-talk button drives the conversation
     if VOICE_AGENT:
         threading.Thread(target=to_iphone, args=(sentence,), daemon=True).start()
         threading.Thread(target=agent_answer, args=(sentence,), daemon=True).start()
@@ -199,11 +202,22 @@ def to_iphone(sentence):
         log(f"!!! iPhone app server not reachable: {e}")
 
 
-def agent_answer(sentence):
+def spoke_into_phone(text):
+    """Hold-to-talk on the phone was released: the person said their line."""
+    text = fix_names(text) if text else "(spoke into the phone)"
+    log(f"((( HEARD (phone): {text}")
+    history.append("Them: " + text)
+    phone.send({"type": "heard", "text": text})
+    if text != "(spoke into the phone)":
+        threading.Thread(target=to_iphone, args=(text,), daemon=True).start()
+    agent_answer(text, force=True)
+
+
+def agent_answer(sentence, force=False):
     """Voice-agent mode: after the person speaks, Sri waits 5-7 s (as if tapping) and says
     her next scripted line. One line per turn; anything said while she is waiting or
     speaking does not advance the script. After the last line she stops until a reset."""
-    if len(sentence.split()) < 3:
+    if not force and len(sentence.split()) < 3:
         return                       # a fragment or a cough, not a turn in the conversation
     if not agent_lock.acquire(blocking=False):
         return                       # already waiting or speaking: don't skip ahead
@@ -213,7 +227,7 @@ def agent_answer(sentence):
             log("--- script: waiting for the intro tap" if step == 0 else "--- script finished (say reset to run again)")
             return
         # The phone buzzes what was heard for 5-7 s (Sri "feeling" it); Sri answers as it ends.
-        key_words = " ".join(sorted(re.findall(r"[A-Za-z0-9]+", sentence), key=len, reverse=True)[:2])
+        key_words = " ".join(sorted(re.findall(r"[A-Za-z0-9]+", sentence), key=len, reverse=True)[:2]) or "HI"
         pulses = buzz.pattern(key_words.upper(), random.uniform(5.0, 7.0))
         pause = buzz.length(pulses)
         phone.send({"type": "buzz", "words": key_words.upper(), "pattern": pulses})
@@ -238,6 +252,7 @@ def feel(sentence):
 
 phone.on_action("start", start_conversation)
 phone.on_action("reset", reset_conversation)
+phone.on_action("spoke", spoke_into_phone)
 address = phone.start()
 log(f"PHONE: open {address} in Safari on the iPhone (same Wi-Fi as this laptop)")
 band = connect(args.number, args.sim)

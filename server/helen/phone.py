@@ -69,7 +69,10 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         name = self.path.rstrip("/").split("/")[-1]
         if self.path.startswith("/action/") and name in _actions:
-            threading.Thread(target=_actions[name], daemon=True).start()
+            length = int(self.headers.get("Content-Length") or 0)
+            text = self.rfile.read(length).decode("utf-8", "replace").strip() if length else ""
+            args = (text,) if name == "spoke" else ()
+            threading.Thread(target=_actions[name], args=args, daemon=True).start()
             return self._reply(200, "text/plain", b"ok")
         self._reply(404, "text/plain", b"not found")
 

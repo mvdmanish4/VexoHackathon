@@ -46,6 +46,7 @@
 <div id="app" class="hidden" style="display:flex;flex-direction:column;flex:1;min-height:0">
   <div id="morse"><div id="words">&nbsp;</div><div id="code"></div></div>
   <div id="log"></div>
+  <button id="talk" style="width:100%;margin-bottom:10px;padding:26px;font-size:22px;background:#2b5ea8;-webkit-user-select:none;user-select:none;touch-action:none">🎤 Hold to talk</button>
   <div class="controls" style="margin-bottom:10px">
     <button id="startConv" style="background:#2e7d4f">▶ Start conversation</button>
     <button id="resetConv" style="background:#7a2e2e">↺ Reset</button>
@@ -197,7 +198,38 @@ document.getElementById("start").onclick = () => {
   document.getElementById("app").classList.remove("hidden");
   connect();
 };
-function action(name) { fetch("/action/" + name, { method: "POST" }).catch(() => {}); }
+function action(name, body) { fetch("/action/" + name, { method: "POST", body: body || "" }).catch(() => {}); }
+
+// ---- Hold to talk: the person speaks into the phone ----------------------------------
+// While held, the phone's own speech recognition writes down what is said (when the
+// browser allows it); on release the text goes to the laptop, which buzzes and lets Sri answer.
+const talk = document.getElementById("talk");
+const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, said = "", holding = false;
+function startTalk(e) {
+  e.preventDefault();
+  if (holding) return;
+  holding = true; said = "";
+  talk.textContent = "🔴 Listening… release when done"; talk.style.background = "#a82b2b";
+  if (Recognition) {
+    try {
+      rec = new Recognition(); rec.lang = "en-US"; rec.interimResults = true; rec.continuous = true;
+      rec.onresult = ev => { said = Array.from(ev.results).map(r => r[0].transcript).join(" "); talk.textContent = "🔴 " + said; };
+      rec.start();
+    } catch (err) { rec = null; }
+  }
+}
+function endTalk(e) {
+  e.preventDefault();
+  if (!holding) return;
+  holding = false;
+  talk.textContent = "🎤 Hold to talk"; talk.style.background = "#2b5ea8";
+  const send = () => action("spoke", said.trim());
+  if (rec) { rec.onend = send; try { rec.stop(); } catch (err) { send(); } setTimeout(() => { if (rec) { rec.onend = null; rec = null; } }, 1500); }
+  else send();
+}
+talk.addEventListener("touchstart", startTalk); talk.addEventListener("touchend", endTalk);
+talk.addEventListener("mousedown", startTalk); talk.addEventListener("mouseup", endTalk);
 document.getElementById("startConv").onclick = () => action("start");
 document.getElementById("resetConv").onclick = () => action("reset");
 document.getElementById("replay").onclick = () => lastMorse && playMorse(lastMorse);
