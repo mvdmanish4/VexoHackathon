@@ -131,6 +131,7 @@ PAGE = r"""<!doctype html>
   video { position: fixed; right: 8px; bottom: 8px; width: 28vw; border-radius: 8px; opacity: .85; }
 </style></head><body class="unknown">
 <button id="start">Start</button>
+<button id="test" hidden style="position:fixed;left:8px;bottom:8px;font-size:4vw;padding:.5em .8em;opacity:.85">Test buzz</button>
 <div id="word" hidden></div><div id="what"></div><div id="morse"></div><div id="info"></div>
 <video id="cam" playsinline muted hidden></video>
 <script>
@@ -140,7 +141,10 @@ const canVibrate = typeof navigator.vibrate === "function";
 // motor-like buzz from the speakers plus a shake of the whole screen, so the audience
 // hears and sees exactly what the phone would feel. A connected game controller rumbles too.
 const desktop = !canVibrate && !("ontouchstart" in window);
-const wantSound = desktop || new URLSearchParams(location.search).has("sound");
+// iPhone: a web page cannot always drive the Taptic Engine, so every pulse ALSO plays a loud
+// low tone. At full volume the phone's own speaker shakes the case enough to feel in the hand.
+const wantSound = desktop || !canVibrate || new URLSearchParams(location.search).has("sound");
+const phoneTone = !desktop && !canVibrate;
 let audio = null;
 function buzz() {
   document.body.classList.remove("shake"); void document.body.offsetWidth;
@@ -151,10 +155,18 @@ function buzz() {
   }
   if (!audio) return;
   const o = audio.createOscillator(), g = audio.createGain(), t = audio.currentTime;
-  o.type = "sawtooth"; o.frequency.value = 85;
-  g.gain.setValueAtTime(0.9, t); g.gain.exponentialRampToValueAtTime(0.01, t + 0.11);
+  o.type = phoneTone ? "square" : "sawtooth"; o.frequency.value = phoneTone ? 175 : 85;
+  g.gain.setValueAtTime(1.0, t); g.gain.exponentialRampToValueAtTime(0.01, t + 0.11);
   o.connect(g); g.connect(audio.destination);
   o.start(t); o.stop(t + 0.12);
+}
+// A held tone for the whole pulse (phones): felt through the case.
+function tone(ms) {
+  if (!audio || !phoneTone) return;
+  const o = audio.createOscillator(), g = audio.createGain(), t = audio.currentTime;
+  o.type = "square"; o.frequency.value = 175; g.gain.value = 1.0;
+  o.connect(g); g.connect(audio.destination);
+  o.start(t); o.stop(t + ms / 1000);
 }
 function tick() { buzz(); hapticTick(); }
 function hapticTick() {
@@ -173,6 +185,7 @@ async function pulse(ms) {
   buzz();
   if (canVibrate) { navigator.vibrate(ms); await sleep(ms); return; }
   if (desktop) { await sleep(ms); return; }
+  tone(ms);
   const end = performance.now() + ms;
   while (performance.now() < end) { hapticTick(); await sleep(28); }
 }
@@ -246,14 +259,21 @@ async function watch() {            // runs for ever: one photo, wait for the an
 }
 
 $("start").onclick = async () => {
-  if (wantSound) audio = new (window.AudioContext || window.webkitAudioContext)();
+  if (wantSound) {
+    audio = new (window.AudioContext || window.webkitAudioContext)();
+    audio.resume();
+    // A silent looping <audio> keeps iPhone sound on even when the ring switch is on silent.
+    const keep = new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=");
+    keep.loop = true; keep.playsInline = true; keep.play().catch(() => {});
+  }
   tick();                            // a first touch unlocks haptics on the iPhone
   try {
     const stream = await navigator.mediaDevices.getUserMedia(
       { video: { facingMode: { ideal: "environment" } }, audio: false });
     const cam = $("cam"); cam.srcObject = stream; cam.hidden = false; await cam.play();
   } catch (e) { $("info").textContent = "Camera not allowed: " + e.message; return; }
-  $("start").hidden = true; $("word").hidden = false;
+  $("start").hidden = true; $("word").hidden = false; $("test").hidden = false;
+  $("test").onclick = async () => { for (let i = 0; i < 3; i++) { await pulse(250); await sleep(150); } };
   if (navigator.wakeLock) navigator.wakeLock.request("screen").catch(() => {});
   feel(); watch();
 };
