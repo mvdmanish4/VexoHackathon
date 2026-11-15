@@ -317,6 +317,48 @@ $("start").onclick = async () => {
 """
 
 
+# A page with no camera at all, to find out what this phone's browser allows:
+# /haptic  ->  "Buzz now" (inside a touch) and an automatic buzz every 4 s (no touch).
+HAPTIC_TEST = r"""<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Haptic test</title>
+<style>body{font-family:-apple-system,system-ui,sans-serif;background:#111;color:#fff;text-align:center;padding:8vw}
+button{font-size:8vw;padding:.6em 1em;margin:.5em;border:0;border-radius:.4em}
+#auto{font-size:7vw;margin-top:1em;padding:.6em;border-radius:.4em;background:#333}
+#auto.on{background:#c41616} p{font-size:4.5vw;opacity:.85}</style></head><body>
+<button id="now">Buzz now</button>
+<div id="auto">automatic buzz: waiting</div>
+<p id="about"></p>
+<p>1. Press <b>Buzz now</b>: do you feel it?<br>2. Then keep your finger off the screen. Every 4 s the box
+turns red and the phone should buzz by itself: do you feel that?</p>
+<script>
+const canVibrate = typeof navigator.vibrate === "function";
+function tickOnce() {
+  if (canVibrate) { navigator.vibrate(40); return; }
+  const label = document.createElement("label");
+  label.ariaHidden = "true"; label.style.display = "none";
+  const input = document.createElement("input");
+  input.type = "checkbox"; input.setAttribute("switch", "");
+  label.appendChild(input); document.head.appendChild(label);
+  label.click(); document.head.removeChild(label);
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function burst(ms) { const end = performance.now() + ms; while (performance.now() < end) { tickOnce(); await sleep(28); } }
+document.getElementById("about").textContent =
+  (canVibrate ? "This browser has the vibrate API (Android)." : "No vibrate API: using the iPhone switch trick.") +
+  " " + navigator.userAgent.replace(/.*(iPhone OS [0-9_]+|Android [0-9.]+).*/, "$1");
+document.getElementById("now").onclick = async () => { for (let i = 0; i < 3; i++) { await burst(250); await sleep(150); } };
+let n = 0;
+setInterval(async () => {
+  const box = document.getElementById("auto"); n++;
+  box.className = "on"; box.textContent = "automatic buzz #" + n + " NOW";
+  for (let i = 0; i < 3; i++) { await burst(250); await sleep(150); }
+  box.className = ""; box.textContent = "automatic buzz: waiting";
+}, 4000);
+</script></body></html>
+"""
+
+
 def laptop_address():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
@@ -368,7 +410,9 @@ def main():
             self.wfile.write(body)
 
         def do_GET(self):
-            if self.path.split("?")[0] == "/":
+            if self.path.split("?")[0] == "/haptic":
+                self._reply(200, "text/html; charset=utf-8", HAPTIC_TEST.encode())
+            elif self.path.split("?")[0] == "/":
                 self._reply(200, "text/html; charset=utf-8", PAGE.encode())
             else:
                 self._reply(404, "text/plain", b"not found")
