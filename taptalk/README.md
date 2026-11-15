@@ -110,7 +110,7 @@ the fallback.
 5. Blindfold test: a teammate taps `... --- ...` with eyes closed, turns the wrist over, and
    the laptop says "SOS".
 
-## Lookout: the phone warns of a wall ahead
+## Lookout: the phone warns of danger ahead
 
 A second helper for the same person. The phone's camera looks ahead and the phone vibrates
 when something is in the way. No app: the laptop serves a web page.
@@ -123,10 +123,13 @@ python3 lookout.py        # prints an https:// address; open it on the phone (sa
    laptop makes its own certificate): **Show details → visit this website**.
 2. Press **Start** and allow the camera. Hold the phone at chest height, camera forward.
 3. About once a second a small photo goes to the laptop and **Gemini** says what is ahead.
+   It looks for anything that could hurt the person, not only walls: stairs, a drop or kerb,
+   cars and bikes, people, doors, glass, furniture, poles, things at head height, cables or a
+   wet floor, fire, sharp things.
 
 | Gemini says | The phone | The screen |
 |---|---|---|
-| `stop`: about 1 m or closer | three fast ticks, then the obstacle spelled in Morse (`WALL` = `.-- .- .-.. .-..`), then three fast ticks repeating | red |
+| `stop`: within about 1 m, or a serious danger at any distance (stairs down, a drop, a road with cars, fire, a hole, water) | three fast ticks, then the obstacle spelled in Morse (`WALL` = `.-- .- .-.. .-..`), then three fast ticks repeating | red |
 | `near`: about 1 to 3 m | `N` in Morse (`-.`), then one slow tick repeating | amber |
 | `clear` | nothing | green |
 | no answer | nothing | grey `?` (never shown as clear) |

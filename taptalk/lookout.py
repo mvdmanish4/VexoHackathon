@@ -1,9 +1,11 @@
-"""Lookout: the phone's camera warns a deaf-blind person of a wall or obstacle ahead, by touch.
+"""Lookout: the phone's camera warns a deaf-blind person of anything dangerous ahead, by touch
+(a wall, stairs, a drop, a road with cars, a person, fire, a wet floor, ...).
 
 The laptop serves one web page. The phone opens it, its rear camera sends a small photo
 about once a second, Gemini says whether something is in the way, and the phone vibrates:
 
-    stop  (about 1 m or closer)   three fast ticks, then the obstacle spelled in Morse
+    stop  (within about 1 m, or a serious danger such as stairs down, a road or fire)
+                                  three fast ticks, then the obstacle spelled in Morse
                                   (WALL = .-- .- .-.. .-..), then three fast ticks repeating
     near  (about 1 to 3 m)        N in Morse (-.), then one slow tick repeating
     clear                         nothing
@@ -36,16 +38,28 @@ from pathlib import Path
 from sponsors import GEMINI_BASE, THINKING_STYLES, Gemini, Voice, _request
 
 LOOK_INSTRUCTIONS = (
-    "This photo is the view straight ahead of a blind person who is walking slowly, taken "
-    "from a phone held at chest height. Decide if a wall, door, person, furniture, step or "
-    "other obstacle is in their path. Answer with JSON only: "
-    '{"level": "stop" | "near" | "clear", "what": "<ONE short word: wall, door, person, chair, table, step, pole>"}. '
-    '"stop" = the obstacle fills most of the view or is within about 1 metre. '
-    '"near" = it is about 1 to 3 metres ahead. '
+    "This photo is the view straight ahead of a deaf-blind person who is walking slowly, "
+    "taken from a phone held at chest height. They cannot see or hear, so you are their only "
+    "warning. Look for ANYTHING that could hurt them or that they could walk into, not only "
+    "walls: stairs or a step up or down, a drop, kerb or platform edge, a hole, a road with "
+    "cars, bikes or scooters, a person, an animal, a door (open or closed), glass, furniture, "
+    "a pole, a low branch or sign at head height, a cable or object on the floor, a wet or "
+    "icy floor, fire, a hot stove, a knife or other sharp thing, water, machinery. "
+    "Answer with JSON only: "
+    '{"level": "stop" | "near" | "clear", "what": "<ONE short word for the main danger>"}. '
+    '"stop" = it is within about 1 metre or fills most of the view, OR it is a serious danger '
+    "at any distance in their path (stairs down, a drop or edge, a road with moving vehicles, "
+    "fire, a hole, water). "
+    '"near" = something in their path about 1 to 3 metres ahead that is not yet serious. '
     '"clear" = nothing in the path for 3 metres or more (then "what" is ""). '
-    "If the photo is too dark or blurred to tell, answer stop with what = unclear."
+    'Use plain words such as wall, door, person, stairs, step, drop, edge, car, bike, chair, '
+    'table, pole, glass, hole, cable, wet, fire, knife, water, dog. If two dangers show, name '
+    "the worse one. If the photo is too dark or blurred to tell, answer stop with what = unclear."
 )
 LEVELS = ("stop", "near", "clear")
+ALWAYS_STOP = {"stairs", "stair", "step", "steps", "drop", "edge", "kerb", "curb", "hole", "car",
+               "truck", "bus", "bike", "scooter", "road", "traffic", "fire", "stove", "knife",
+               "water", "pool", "train", "platform"}
 _style = {"index": 0}       # the THINKING_STYLES entry that works for this model, remembered
 
 
@@ -77,7 +91,10 @@ def look(gemini, jpeg):
                 level = str(answer.get("level", "")).lower()
                 if level not in LEVELS:
                     return unknown
-                return {"level": level, "what": str(answer.get("what", ""))[:30]}
+                what = str(answer.get("what", ""))[:30]
+                if level == "near" and what.lower() in ALWAYS_STOP:
+                    level = "stop"          # serious dangers never get the softer warning
+                return {"level": level, "what": what}
             if candidate.get("finishReason") != "MAX_TOKENS":
                 return unknown
         except urllib.error.HTTPError as e:
