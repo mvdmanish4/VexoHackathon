@@ -36,7 +36,11 @@ def reply(sentence, history, always=False):
     answer = ask(prompt)
     if not answer or answer.strip().upper().startswith("SKIP"):
         return None if not always else "Sorry, could you say that again?"
-    return answer.strip().strip('"')
+    answer = answer.strip().strip('"')
+    for label in ("Me:", "Sri:", "Them:"):               # the model sometimes copies the history labels
+        if answer.startswith(label):
+            answer = answer[len(label):].strip()
+    return answer
 
 
 def vibrate_on_phone(sentence):
