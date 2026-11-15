@@ -159,7 +159,9 @@ const canVibrate = typeof navigator.vibrate === "function";
 const desktop = !canVibrate && !("ontouchstart" in window);
 // iPhone: a web page cannot always drive the Taptic Engine, so every pulse ALSO plays a loud
 // low tone. At full volume the phone's own speaker shakes the case enough to feel in the hand.
-const wantSound = desktop || new URLSearchParams(location.search).has("sound");
+// Sound is on everywhere (add ?quiet=1 to turn it off): if a phone will not vibrate from a web
+// page, the pattern can still be heard, and felt through the speaker at full volume.
+const wantSound = !new URLSearchParams(location.search).has("quiet");
 const phoneTone = !desktop && !canVibrate && wantSound;
 // iPhone: the Taptic Engine is silenced while the camera is capturing (the same page with no
 // camera vibrates fine). So on an iPhone the camera is closed after each photo, the warning
@@ -175,7 +177,7 @@ function buzz() {
   }
   if (!audio) return;
   const o = audio.createOscillator(), g = audio.createGain(), t = audio.currentTime;
-  o.type = phoneTone ? "square" : "sawtooth"; o.frequency.value = phoneTone ? 175 : 85;
+  o.type = phoneTone ? "square" : "sawtooth"; o.frequency.value = phoneTone ? 220 : 170;
   g.gain.setValueAtTime(1.0, t); g.gain.exponentialRampToValueAtTime(0.01, t + 0.11);
   o.connect(g); g.connect(audio.destination);
   o.start(t); o.stop(t + 0.12);
@@ -184,7 +186,7 @@ function buzz() {
 function tone(ms) {
   if (!audio || !phoneTone) return;
   const o = audio.createOscillator(), g = audio.createGain(), t = audio.currentTime;
-  o.type = "square"; o.frequency.value = 175; g.gain.value = 1.0;
+  o.type = "square"; o.frequency.value = 220; g.gain.value = 1.0;
   o.connect(g); g.connect(audio.destination);
   o.start(t); o.stop(t + ms / 1000);
 }
@@ -301,7 +303,13 @@ async function run() {              // for ever: one photo, the answer, then the
 }
 
 $("start").onclick = async () => {
-  if (wantSound) audio = new (window.AudioContext || window.webkitAudioContext)();
+  if (wantSound) {
+    audio = new (window.AudioContext || window.webkitAudioContext)();
+    audio.resume();
+    // A silent looping <audio> keeps iPhone sound on even when the ring switch is on silent.
+    const keep = new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=");
+    keep.loop = true; keep.playsInline = true; keep.play().catch(() => {});
+  }
   tick();                            // a first touch unlocks haptics on the iPhone
   try { await openCam(); }
   catch (e) { $("info").textContent = "Camera not allowed: " + e.message; return; }
