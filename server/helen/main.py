@@ -108,7 +108,7 @@ def say_line(sentence):
     try:
         log(f"<<< SAYING: {sentence}")
         history.append("Me: " + sentence)
-        if phone.phones():
+        if phone.phones() or (VOICE_AGENT and PHONE_MIC):   # phone demo: never speak on the laptop
             say_on_phone(sentence)
             return
         phone.send({"type": "say", "text": sentence})
