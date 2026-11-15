@@ -272,9 +272,10 @@ def phone_turn(text, from_band=False):
         words = " ".join(sorted(re.findall(r"[A-Za-z0-9]+", text), key=len, reverse=True)[:2]).upper() or "HI"
         pulses = buzz.pattern(words, 2.0)
         phone.send({"type": "buzz", "words": words, "pattern": pulses})
-        pause = random.uniform(3.0, 5.0)    # Shri feels the vibration, then types his reply
+        pause = float(config.get("REPLY_PAUSE", "0"))   # extra wait before Shri replies (0 = none)
         log(f">>> SRI: phone buzzes {buzz.length(pulses):.1f} s, then {pause:.1f} s pause, then answers")
-        time.sleep(buzz.length(pulses) + pause)
+        if pause:
+            time.sleep(buzz.length(pulses) + pause)
         worker.join(timeout=10)
         say_line(reply.get("text") or "Sorry, could you say that again?")
         script_step[0] += 1
