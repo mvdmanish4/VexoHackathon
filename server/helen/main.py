@@ -3,6 +3,7 @@
 #   someone speaks -> band mic -> Deepgram -> AI shortens -> Morse to feel
 #   .venv/bin/python -m helen.main 46
 import argparse
+import re
 import threading
 import time
 
@@ -126,7 +127,23 @@ def is_echo(sentence):
     return False
 
 
+# Names speech-to-text gets wrong in our demo, and what they should be.
+NAME_FIXES = [
+    (r"\b(five|5|pipe|pi?pe?)[ -]?cats?\b", "Pipecat"),
+    (r"\b(11|eleven)[ -]?labs?\b", "ElevenLabs"),
+    (r"\bday[ -]?break\b", "Daybreak"),
+    (r"\b(shree|shri|sree)\b", "Sri"),
+]
+
+
+def fix_names(sentence):
+    for pattern, name in NAME_FIXES:
+        sentence = re.sub(pattern, name, sentence, flags=re.IGNORECASE)
+    return sentence
+
+
 def heard(sentence):
+    sentence = fix_names(sentence)
     if is_echo(sentence):
         log(f"--- ignored our own voice: {sentence}")
         return
