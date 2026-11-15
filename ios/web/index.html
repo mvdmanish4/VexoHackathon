@@ -167,6 +167,7 @@ function connect() {
     const ev = JSON.parse(e.data);
     if (ev.type === "log") addLog(ev.line);
     if (ev.type === "finish" && listening && spoke) finish();   // the band heard the sentence end
+    if (ev.type === "end") { conversationOn = false; endAfterVoice = true; }   // Shri said goodbye
     if (ev.type === "reset") {
       log.innerHTML = "";
       document.getElementById("words").innerHTML = "&nbsp;";
@@ -191,6 +192,7 @@ function connect() {
         showStatus("🔊 Shri is speaking…", "#2e7d4f");
         const turn = ++voiceTurn;      // only the newest reply may reopen the mic
         playVoice(ev.audio, async () => {
+          if (endAfterVoice) { endAfterVoice = false; showStatus("✅ Conversation ended. Press ↺ Reset for another take", "#3a3f47"); return; }
           if (turn !== voiceTurn || !conversationOn) return;
           if (await openMic() && turn === voiceTurn) setTimeout(listen, 300);
         });
@@ -216,7 +218,7 @@ function action(name, body) { fetch("/action/" + name, { method: "POST", body: b
 // laptop, which transcribes it (Deepgram) and lets Sri answer. While Sri talks we don't record.
 const talk = document.getElementById("talk");
 let micStream = null, audioCtx = null, analyser = null, recorder = null, chunks = [];
-let voiceTurn = 0;
+let voiceTurn = 0, endAfterVoice = false;
 let listening = false, conversationOn = false, spoke = false, lastLoud = 0, turnStart = 0, floor = 0.01, levelTimer = null;
 let peak = 0, speechStart = 0;
 function showStatus(text, color) { talk.textContent = text; talk.style.background = color; }

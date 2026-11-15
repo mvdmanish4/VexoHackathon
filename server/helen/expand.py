@@ -13,8 +13,8 @@ MORSE_CODE = {letter: code for code, letter in MORSE.items()}
 QUICK_COUNT = {     # demo script: Sri meets someone at the hackathon
     1: "Hi, I'm Shri. I'm a deafblind person, and I'll be communicating via the phone.",
     2: "What are you building at the hackathon?",
-    3: "Nice! What are you using to build it?",
-    4: "Got it. All the best!",
+    3: "Nice. What are you using to build it?",
+    4: "Got it. All the best.",
     5: "Sorry, could you please repeat that?",
 }
 

@@ -252,21 +252,15 @@ def phone_turn(text, from_band=False):
     if script_step[0] == 0:
         log("--- press Start conversation first")
         return
+    if script_step[0] >= len(SCRIPT):
+        return                                    # conversation already closed
     if not agent_lock.acquire(blocking=False):
         return                                    # Sri is still answering the last turn
     try:
-        if from_band:
-            # The band hears the whole room: only answer what was said to Sri.
-            answer = agent.reply(text, history, always=False)
-            if not answer:
-                log(f"--- not for Sri, no reply: {text}")
-                return
-            reply = {"text": answer}
-            worker = threading.Thread(target=lambda: None)
-        else:
-            reply = {}
-            worker = threading.Thread(target=lambda: reply.setdefault(
-                "text", agent.reply(text or "(they said something you did not catch)", history, always=True)))
+        # Shri sticks to his script: his next line after each turn, then he closes.
+        line = SCRIPT[min(script_step[0], len(SCRIPT) - 1)]
+        reply = {"text": line}
+        worker = threading.Thread(target=lambda: None)
         worker.start()                            # think while the phone buzzes and Sri "types"
         words = " ".join(sorted(re.findall(r"[A-Za-z0-9]+", text), key=len, reverse=True)[:2]).upper() or "HI"
         pulses = buzz.pattern(words, 2.0)
@@ -276,6 +270,10 @@ def phone_turn(text, from_band=False):
         time.sleep(buzz.length(pulses) + pause)
         worker.join(timeout=10)
         say_line(reply.get("text") or "Sorry, could you say that again?")
+        script_step[0] += 1
+        if script_step[0] >= len(SCRIPT):
+            log(">>> conversation finished")
+            phone.send({"type": "end"})
     except Exception as e:
         log(f"!!! Sri could not answer: {e}")
     finally:
