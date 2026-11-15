@@ -144,7 +144,8 @@ PAGE = r"""<!doctype html>
   #morse { font-size: 9vw; min-height: 1.3em; font-family: ui-monospace, Menlo, monospace; letter-spacing: .1em; }
   #info { font-size: 4vw; opacity: .8; margin-top: 1em; padding: 0 1em; }
   button { font-size: 9vw; padding: .6em 1.2em; border: 0; border-radius: .4em; background: #fff; color: #111; }
-  video { position: fixed; right: 8px; bottom: 8px; width: 28vw; border-radius: 8px; opacity: .85; }
+  video { position: fixed; right: 8px; bottom: 8px; width: 42vw; max-width: 420px; border-radius: 10px;
+          border: 3px solid rgba(255,255,255,.8); }
 </style></head><body class="unknown">
 <button id="start">Start</button>
 <button id="test" hidden style="position:fixed;left:8px;bottom:8px;font-size:4vw;padding:.5em .8em;opacity:.85">Test buzz</button>
@@ -167,7 +168,9 @@ const phoneTone = !desktop && !canVibrate && wantSound;
 // iPhone: the Taptic Engine is silenced while the camera is capturing (the same page with no
 // camera vibrates fine). So on an iPhone the camera is closed after each photo, the warning
 // is felt with the camera off, and the camera is opened again for the next look.
-const iphone = !desktop && !canVibrate;
+// That made the picture blink and did not bring the vibration back on the phone we tried, so
+// it is off by default: the camera stays open all the time. Add ?cycle=1 to turn it on.
+const iphone = !desktop && !canVibrate && new URLSearchParams(location.search).has("cycle");
 let audio = null;
 function buzz() {
   document.body.classList.remove("shake"); void document.body.offsetWidth;
