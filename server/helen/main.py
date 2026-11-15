@@ -81,10 +81,14 @@ def sent(words):
 
 
 def say_line(sentence):
-    """Speak a fixed sentence (demo script), the same way say() does after the AI step."""
+    """Speak a fixed sentence (demo script). With a phone page open, the phone plays it
+    (ElevenLabs voice); otherwise the laptop speaks."""
     try:
         log(f"<<< SAYING: {sentence}")
         history.append("Me: " + sentence)
+        if phone.phones():
+            say_on_phone(sentence)
+            return
         phone.send({"type": "say", "text": sentence})
         if listener:
             listener.mute(30)
@@ -120,7 +124,7 @@ def say_on_phone(sentence):
         speak(sentence)
         return
     if listener:
-        listener.mute(len(mp3) / 16000 + 1.5)   # 128 kbit/s mp3 = 16 kB per second
+        listener.mute(len(mp3) / 16000 + 3.0)   # 128 kbit/s mp3 = 16 kB per second; + Deepgram's lag
     phone.send({"type": "say", "text": sentence, "audio": phone.add_audio(mp3)})
     log("    (voice sent to the phone)")
 
