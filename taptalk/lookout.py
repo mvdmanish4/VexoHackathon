@@ -16,8 +16,9 @@ The laptop also says "Wall ahead" out loud once, so people nearby know why the p
 
     python3 lookout.py            then open the printed https:// address on the phone
 
-To try it on the laptop itself, open https://localhost:8766/?sound=1 : it uses the laptop's
-camera, and each tick is a click you can hear (a laptop cannot vibrate).
+To present it from Chrome on the laptop, open https://localhost:8766 : it uses the laptop's
+camera. A laptop cannot vibrate, so each tick is a low buzz from the speakers and a shake of
+the screen (and a rumble on a connected game controller).
 
 Needs GEMINI_API_KEY in the environment or in ./.env (never printed or stored). A camera in a
 web page needs HTTPS, so this makes a throwaway certificate; the phone shows one warning the
@@ -117,6 +118,9 @@ PAGE = r"""<!doctype html>
   html, body { margin: 0; height: 100%; font-family: -apple-system, system-ui, sans-serif; }
   body { background: #222; color: #fff; display: flex; flex-direction: column;
          align-items: center; justify-content: center; text-align: center; transition: background .15s; }
+  @keyframes shake { 0%,100% { transform: translate(0,0); } 20% { transform: translate(-9px,3px); }
+    40% { transform: translate(8px,-3px); } 60% { transform: translate(-6px,2px); } 80% { transform: translate(5px,-2px); } }
+  body.shake > * { animation: shake .11s linear; }
   body.stop { background: #c41616; } body.near { background: #c98a00; }
   body.clear { background: #14803c; } body.unknown { background: #444; }
   #word { font-size: 22vw; font-weight: 800; line-height: 1; text-transform: uppercase; }
@@ -132,19 +136,28 @@ PAGE = r"""<!doctype html>
 <script>
 // Haptics: iPhone (iOS 18+) ticks when a hidden "switch" is flipped; Android uses vibrate.
 const canVibrate = typeof navigator.vibrate === "function";
-// With ?sound=1 in the address every tick also clicks, so a laptop (which cannot vibrate)
-// or an audience can follow the pattern.
-const wantSound = new URLSearchParams(location.search).has("sound");
+// A laptop cannot vibrate. In a desktop browser (or with ?sound=1) every tick is a low
+// motor-like buzz from the speakers plus a shake of the whole screen, so the audience
+// hears and sees exactly what the phone would feel. A connected game controller rumbles too.
+const desktop = !canVibrate && !("ontouchstart" in window);
+const wantSound = desktop || new URLSearchParams(location.search).has("sound");
 let audio = null;
-function click() {
+function buzz() {
+  document.body.classList.remove("shake"); void document.body.offsetWidth;
+  document.body.classList.add("shake");
+  for (const pad of (navigator.getGamepads ? navigator.getGamepads() : [])) {
+    if (pad && pad.vibrationActuator) pad.vibrationActuator.playEffect("dual-rumble",
+      { duration: 90, strongMagnitude: 1, weakMagnitude: 1 }).catch(() => {});
+  }
   if (!audio) return;
-  const o = audio.createOscillator(), g = audio.createGain();
-  o.frequency.value = 880; g.gain.value = 0.25;
+  const o = audio.createOscillator(), g = audio.createGain(), t = audio.currentTime;
+  o.type = "sawtooth"; o.frequency.value = 85;
+  g.gain.setValueAtTime(0.9, t); g.gain.exponentialRampToValueAtTime(0.01, t + 0.11);
   o.connect(g); g.connect(audio.destination);
-  o.start(); o.stop(audio.currentTime + 0.05);
+  o.start(t); o.stop(t + 0.12);
 }
-function tick() {
-  click();
+function tick() { buzz(); hapticTick(); }
+function hapticTick() {
   if (canVibrate) { navigator.vibrate(40); return; }
   const label = document.createElement("label");
   label.ariaHidden = "true"; label.style.display = "none";
@@ -154,6 +167,15 @@ function tick() {
   label.click(); document.head.removeChild(label);
 }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+// One strong pulse of `ms` milliseconds. Android: one long vibration. iPhone: a burst of
+// rapid Taptic ticks (one tick alone is too faint to notice). Desktop: one buzz and shake.
+async function pulse(ms) {
+  buzz();
+  if (canVibrate) { navigator.vibrate(ms); await sleep(ms); return; }
+  if (desktop) { await sleep(ms); return; }
+  const end = performance.now() + ms;
+  while (performance.now() < end) { hapticTick(); await sleep(28); }
+}
 const $ = id => document.getElementById(id);
 let level = "unknown", thing = "", seen = 0;
 
@@ -171,15 +193,15 @@ const MORSE = { A:".-", B:"-...", C:"-.-.", D:"-..", E:".", F:"..-.", G:"--.", H
   J:".---", K:"-.-", L:".-..", M:"--", N:"-.", O:"---", P:".--.", Q:"--.-", R:".-.", S:"...",
   T:"-", U:"..-", V:"...-", W:".--", X:"-..-", Y:"-.--", Z:"--.." };
 const T = { tickGap: 110, symbolGap: 380, letterGap: 900 };
-async function alertTicks() { for (let i = 0; i < 3; i++) { tick(); await sleep(130); } }
+async function alertTicks() { for (let i = 0; i < 3; i++) { await pulse(170); await sleep(110); } }
 async function feelWord(word) {
   const letters = word.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 6);
   for (let i = 0; i < letters.length; i++) {
     const code = MORSE[letters[i]];
     $("morse").textContent = letters.slice(0, i + 1) + "   " + code;
     for (const s of code) {
-      tick();
-      if (s === "-") { await sleep(T.tickGap); tick(); }
+      await pulse(90);
+      if (s === "-") { await sleep(T.tickGap); await pulse(90); }
       await sleep(T.symbolGap);
     }
     await sleep(T.letterGap);
@@ -201,7 +223,7 @@ async function feel() {             // runs for ever: turns what is ahead into t
       } else await sleep(1000);                 // still there: keep warning
     } else if (level === "near") {
       if (told !== "near") { told = "near"; await feelWord("N"); }   // N = near
-      else { tick(); await sleep(1500); }       // one slow tick while it stays near
+      else { await pulse(120); await sleep(1500); }   // one slow pulse while it stays near
     } else { if (level === "clear") told = ""; await sleep(150); }
   }
 }
@@ -327,7 +349,7 @@ def main():
     print("On the phone (same Wi-Fi) open:  https://%s:%d" % (address, a.port))
     print("The first time, the phone warns about the certificate: Show details -> visit this website.")
     print("Then press Start and allow the camera. Ctrl+C stops.")
-    print("On this laptop instead:  https://localhost:%d/?sound=1  (ticks are clicks you can hear)\n" % a.port)
+    print("On this laptop instead:  https://localhost:%d  (each tick buzzes the speakers and shakes the screen)\n" % a.port)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
