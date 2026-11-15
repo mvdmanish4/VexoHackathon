@@ -188,7 +188,11 @@ function connect() {
         stopListening();
         releaseMic();
         showStatus("🔊 Sri is speaking…", "#2e7d4f");
-        playVoice(ev.audio, async () => { if (conversationOn && await openMic()) setTimeout(listen, 300); });
+        const turn = ++voiceTurn;      // only the newest reply may reopen the mic
+        playVoice(ev.audio, async () => {
+          if (turn !== voiceTurn || !conversationOn) return;
+          if (await openMic() && turn === voiceTurn) setTimeout(listen, 300);
+        });
       }
     }
   };
@@ -211,6 +215,7 @@ function action(name, body) { fetch("/action/" + name, { method: "POST", body: b
 // laptop, which transcribes it (Deepgram) and lets Sri answer. While Sri talks we don't record.
 const talk = document.getElementById("talk");
 let micStream = null, audioCtx = null, analyser = null, recorder = null, chunks = [];
+let voiceTurn = 0;
 let listening = false, conversationOn = false, spoke = false, lastLoud = 0, turnStart = 0, floor = 0.01, levelTimer = null;
 function showStatus(text, color) { talk.textContent = text; talk.style.background = color; }
 function debug(msg) { action("debug", msg); }
@@ -218,14 +223,16 @@ function debug(msg) { action("debug", msg); }
 async function openMic() {
   if (micStream) return true;
   try {
-    micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
     if (!audioCtx) { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
     try { await audioCtx.resume(); } catch (e) {}
     analyser = audioCtx.createAnalyser(); analyser.fftSize = 1024;
-    audioCtx.createMediaStreamSource(micStream).connect(analyser);
+    audioCtx.createMediaStreamSource(stream).connect(analyser);
+    micStream = stream;
     debug("mic open");
     return true;
   } catch (e) {
+    if (e.name !== "NotAllowedError") { debug("mic retry: " + e.message); return false; }
     showStatus("⚠️ Microphone blocked: allow it in Safari (aA → Website Settings → Microphone)", "#a82b2b");
     debug("mic blocked: " + e.name + " " + e.message);
     return false;
