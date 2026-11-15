@@ -286,7 +286,7 @@ def main():
             self.wfile.write(body)
 
         def do_GET(self):
-            if self.path == "/":
+            if self.path.split("?")[0] == "/":
                 self._reply(200, "text/html; charset=utf-8", PAGE.encode())
             else:
                 self._reply(404, "text/plain", b"not found")
