@@ -57,6 +57,8 @@ script_step = [0]
 
 
 def sent(words):
+    if IGNORE_BAND:
+        return
     if VOICE_AGENT:
         # Taps are only acted out on camera: the first one plays Sri's intro, the AI does the rest.
         if script_step[0] == 0:
@@ -179,7 +181,12 @@ def fix_names(sentence):
     return sentence
 
 
+IGNORE_BAND = config.get("IGNORE_BAND", "0") == "1"   # phone-only demo: band taps and mic do nothing
+
+
 def heard(sentence):
+    if IGNORE_BAND:
+        return
     sentence = fix_names(sentence)
     if is_echo(sentence):
         log(f"--- ignored our own voice: {sentence}")

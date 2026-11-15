@@ -11,6 +11,7 @@ from pathlib import Path
 from helen.band import KIT
 
 sys.path.insert(0, str(KIT.parent / "examples" / "python"))
+from helen import config  # noqa: E402
 import speech  # noqa: E402  (the kit's Deepgram client)
 from ogg_opus import OggOpusWriter  # noqa: E402
 
@@ -85,7 +86,7 @@ class Listener:
             if self.packets_seen and time.monotonic() - self.last_words > STALL:
                 self.log(f"!!! Deepgram returned no words for {STALL:.0f} s: reconnecting to Deepgram")
                 self._reopen_ears()
-            if silent >= 3:
+            if silent >= 3 and config.get("IGNORE_BAND", "0") != "1":
                 self.log("!!! no sound from the band for 30 s: restarting to reconnect (double-tap the band)")
                 os._exit(3)
 
