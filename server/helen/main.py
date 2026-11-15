@@ -10,7 +10,7 @@ import time
 from helen import phone
 from helen.band import connect
 from helen.compress import compress
-from helen import config
+from helen import agent, config
 from helen.expand import QUICK_COUNT, expand, quick
 from helen.listen import Listener
 from helen.morse import encode
@@ -46,11 +46,22 @@ def is_stray(words):
 # was tapped, so the demo can't be thrown off by a misread tap. After the last line it
 # starts again.
 DEMO_SCRIPT = config.get("DEMO_SCRIPT", "0") == "1"
+VOICE_AGENT = config.get("VOICE_AGENT", "0") == "1"   # AI "Sri" answers whoever talks (helen/agent.py)
+agent_lock = threading.Lock()
 SCRIPT = [QUICK_COUNT[n] for n in (1, 2, 3, 4)]
 script_step = [0]
 
 
 def sent(words):
+    if VOICE_AGENT:
+        # Taps are only acted out on camera: the first one plays Sri's intro, the AI does the rest.
+        if script_step[0] == 0:
+            script_step[0] = 1
+            log(f">>> TAPPED: {words}   (voice agent: intro)")
+            threading.Thread(target=say_line, args=(SCRIPT[0],), daemon=True).start()
+        else:
+            log(f"--- tap ignored in voice-agent mode: {words}")
+        return
     if DEMO_SCRIPT:
         line = SCRIPT[script_step[0] % len(SCRIPT)]
         log(f">>> TAPPED: {words}   (demo script line {script_step[0] % len(SCRIPT) + 1})")
@@ -151,7 +162,35 @@ def heard(sentence):
     log(f"((( HEARD: {sentence}")
     phone.send({"type": "heard", "text": sentence})
     history.append("Them: " + sentence)
+    if VOICE_AGENT:
+        threading.Thread(target=to_iphone, args=(sentence,), daemon=True).start()
+        threading.Thread(target=agent_answer, args=(sentence,), daemon=True).start()
     threading.Thread(target=feel, args=(sentence,), daemon=True).start()
+
+
+def to_iphone(sentence):
+    try:
+        agent.vibrate_on_phone(sentence)
+        log("    (sent to the iPhone app)")
+    except Exception as e:
+        log(f"!!! iPhone app server not reachable: {e}")
+
+
+def agent_answer(sentence):
+    """Voice-agent mode: Sri answers out loud (one answer at a time)."""
+    if not agent_lock.acquire(blocking=False):
+        return                       # already answering: don't talk over ourselves
+    try:
+        answer = agent.reply(sentence, history)
+        if answer:
+            log(f">>> SRI (voice agent) answers")
+            say_line(answer)
+        else:
+            log(f"--- not answered (not said to Sri): {sentence}")
+    except Exception as e:
+        log(f"!!! voice agent failed: {e}")
+    finally:
+        agent_lock.release()
 
 
 def feel(sentence):
@@ -177,6 +216,8 @@ try:
 except Exception as e:
     log(f"!!! not listening (taps still work): {e}")
 log("Ready: tap Morse, turn wrist over and hold 2s to speak. Ctrl+C to stop.")
+if VOICE_AGENT:
+    log(f"VOICE AGENT ON: Sri answers whoever talks; heard sentences go to the iPhone app at {agent.IOS_SERVER}")
 if DEMO_SCRIPT:
     log("DEMO SCRIPT ON: each send plays the next line: " + " | ".join(SCRIPT))
 try:
