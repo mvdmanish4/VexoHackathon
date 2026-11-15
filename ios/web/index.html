@@ -74,36 +74,46 @@ function tick() {
   document.head.removeChild(label);
 }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const T = { tickGap: 110, symbolGap: 380, letterGap: 900, wordGap: 1600 };
 
 const morseBox = document.getElementById("morse");
-async function pulse() {
-  tick();
-  morseBox.classList.add("flash");          // visible to the audience too
-  await sleep(60);
+
+// One strong buzz of `ms` milliseconds: a long vibration on Android, a burst of rapid
+// Taptic ticks on iPhone (one tick alone is too faint to notice).
+async function buzzFor(ms) {
+  morseBox.classList.add("flash");
+  if (canVibrate) {
+    navigator.vibrate(ms);
+    await sleep(ms);
+  } else {
+    const end = performance.now() + ms;
+    while (performance.now() < end) { tick(); await sleep(28); }
+  }
   morseBox.classList.remove("flash");
 }
 
+// Play [[on_ms, off_ms], ...] pulses (built by the server, so it knows how long this takes).
 let playing = Promise.resolve();
-let lastMorse = "";
-function playMorse(morse) {
-  lastMorse = morse;
+function playPattern(pulses) {
   playing = playing.then(async () => {
-    for (let i = 0; i < 3; i++) { await pulse(); await sleep(70); }   // "message coming"
-    await sleep(T.wordGap);
-    for (const word of morse.split(" / ")) {
-      for (const letter of word.split(" ")) {
-        for (const s of letter) {
-          await pulse();
-          if (s === "-") { await sleep(T.tickGap); await pulse(); }
-          await sleep(T.symbolGap);
-        }
-        await sleep(T.letterGap);
-      }
-      await sleep(T.wordGap);
-    }
+    for (const [on, off] of pulses) { await buzzFor(on); await sleep(off); }
   });
 }
+
+// Morse text -> pulses (same timing as server/helen/buzz.py), for Test buzz and older events.
+const DOT = 120, DASH = 360, GAP = 160, LETTER = 420, WORD = 800;
+function morsePulses(morse) {
+  const out = [];
+  for (const word of morse.split(" / ")) {
+    for (const letter of word.split(" ")) {
+      for (const s of letter) out.push([s === "-" ? DASH : DOT, GAP]);
+      if (out.length) out[out.length - 1][1] = LETTER;
+    }
+    if (out.length) out[out.length - 1][1] = WORD;
+  }
+  return out;
+}
+let lastMorse = "";
+function playMorse(morse) { lastMorse = morse; playPattern(morsePulses(morse)); }
 
 // ---- Voice ---------------------------------------------------------------------------
 const voice = new Audio();
@@ -156,6 +166,11 @@ function connect() {
       document.getElementById("words").textContent = ev.words.replace(/ Q$/, " ?");
       document.getElementById("code").textContent = ev.morse;
       playMorse(ev.morse);
+    }
+    if (ev.type === "buzz") {          // voice-agent demo: buzz now, Sri speaks when it ends
+      document.getElementById("words").textContent = ev.words;
+      document.getElementById("code").textContent = "";
+      playPattern(ev.pattern);
     }
     if (ev.type === "say") {
       addLine("me", ev.text);

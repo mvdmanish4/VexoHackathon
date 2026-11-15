@@ -11,7 +11,7 @@ import time
 from helen import phone
 from helen.band import connect
 from helen.compress import compress
-from helen import agent, config
+from helen import agent, buzz, config
 from helen.expand import QUICK_COUNT, expand, quick
 from helen.listen import Listener
 from helen.morse import encode
@@ -166,6 +166,7 @@ def heard(sentence):
     if VOICE_AGENT:
         threading.Thread(target=to_iphone, args=(sentence,), daemon=True).start()
         threading.Thread(target=agent_answer, args=(sentence,), daemon=True).start()
+        return                       # the buzz is sent by agent_answer, in step with Sri
     threading.Thread(target=feel, args=(sentence,), daemon=True).start()
 
 
@@ -190,9 +191,13 @@ def agent_answer(sentence):
         if step == 0 or step >= len(SCRIPT):
             log("--- script: waiting for the intro tap" if step == 0 else "--- script finished (say reset to run again)")
             return
-        pause = random.uniform(5.0, 7.0)
-        log(f">>> SRI (voice agent) answers line {step + 1} in {pause:.1f} s")
-        time.sleep(pause)
+        # The phone buzzes what was heard for 5-7 s (Sri "feeling" it); Sri answers as it ends.
+        key_words = " ".join(sorted(re.findall(r"[A-Za-z0-9]+", sentence), key=len, reverse=True)[:2])
+        pulses = buzz.pattern(key_words.upper(), random.uniform(5.0, 7.0))
+        pause = buzz.length(pulses)
+        phone.send({"type": "buzz", "words": key_words.upper(), "pattern": pulses})
+        log(f">>> SRI (voice agent): phone buzzes {pause:.1f} s, then line {step + 1}")
+        time.sleep(pause + 0.3)
         script_step[0] = step + 1
         say_line(SCRIPT[step])
     except Exception as e:
