@@ -16,6 +16,9 @@ The laptop also says "Wall ahead" out loud once, so people nearby know why the p
 
     python3 lookout.py            then open the printed https:// address on the phone
 
+To try it on the laptop itself, open https://localhost:8766/?sound=1 : it uses the laptop's
+camera, and each tick is a click you can hear (a laptop cannot vibrate).
+
 Needs GEMINI_API_KEY in the environment or in ./.env (never printed or stored). A camera in a
 web page needs HTTPS, so this makes a throwaway certificate; the phone shows one warning the
 first time (Show details -> visit this website). Limits: Gemini judges distance from one
@@ -129,7 +132,19 @@ PAGE = r"""<!doctype html>
 <script>
 // Haptics: iPhone (iOS 18+) ticks when a hidden "switch" is flipped; Android uses vibrate.
 const canVibrate = typeof navigator.vibrate === "function";
+// With ?sound=1 in the address every tick also clicks, so a laptop (which cannot vibrate)
+// or an audience can follow the pattern.
+const wantSound = new URLSearchParams(location.search).has("sound");
+let audio = null;
+function click() {
+  if (!audio) return;
+  const o = audio.createOscillator(), g = audio.createGain();
+  o.frequency.value = 880; g.gain.value = 0.25;
+  o.connect(g); g.connect(audio.destination);
+  o.start(); o.stop(audio.currentTime + 0.05);
+}
 function tick() {
+  click();
   if (canVibrate) { navigator.vibrate(40); return; }
   const label = document.createElement("label");
   label.ariaHidden = "true"; label.style.display = "none";
@@ -209,6 +224,7 @@ async function watch() {            // runs for ever: one photo, wait for the an
 }
 
 $("start").onclick = async () => {
+  if (wantSound) audio = new (window.AudioContext || window.webkitAudioContext)();
   tick();                            // a first touch unlocks haptics on the iPhone
   try {
     const stream = await navigator.mediaDevices.getUserMedia(
@@ -310,7 +326,8 @@ def main():
         else "OFF (%s): every look will say unknown" % gemini.problem))
     print("On the phone (same Wi-Fi) open:  https://%s:%d" % (address, a.port))
     print("The first time, the phone warns about the certificate: Show details -> visit this website.")
-    print("Then press Start and allow the camera. Ctrl+C stops.\n")
+    print("Then press Start and allow the camera. Ctrl+C stops.")
+    print("On this laptop instead:  https://localhost:%d/?sound=1  (ticks are clicks you can hear)\n" % a.port)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
