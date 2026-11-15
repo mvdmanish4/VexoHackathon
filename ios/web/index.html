@@ -187,7 +187,7 @@ function connect() {
       if (ev.audio) {
         stopListening();
         releaseMic();
-        showStatus("🔊 Sri is speaking…", "#2e7d4f");
+        showStatus("🔊 Shri is speaking…", "#2e7d4f");
         const turn = ++voiceTurn;      // only the newest reply may reopen the mic
         playVoice(ev.audio, async () => {
           if (turn !== voiceTurn || !conversationOn) return;
@@ -287,7 +287,7 @@ function finish() {
   if (!listening) return;
   clearInterval(levelTimer);
   listening = false;
-  showStatus("📳 Sri is feeling it…", "#6b4fa8");
+  showStatus("📳 Shri is feeling it…", "#6b4fa8");
   if (recorder && recorder.state !== "inactive") recorder.stop(); else sendTurn();
 }
 function sendTurn() {
@@ -299,7 +299,7 @@ talk.addEventListener("click", () => { if (listening) finish(); });
 
 document.getElementById("startConv").onclick = async () => {
   if (!(await openMic())) return;
-  conversationOn = true; stopListening(); showStatus("🔊 Sri is speaking…", "#2e7d4f"); action("start");
+  conversationOn = true; stopListening(); showStatus("🔊 Shri is speaking…", "#2e7d4f"); action("start");
 };
 document.getElementById("resetConv").onclick = () => { conversationOn = false; stopListening(); releaseMic(); showStatus("Press ▶ Start conversation", "#3a3f47"); action("reset"); };
 document.getElementById("replay").onclick = () => lastMorse && playMorse(lastMorse);
@@ -360,7 +360,7 @@ if (location.hash === "#agent" || new URLSearchParams(location.search).has("agen
         onConnect: () => { st.textContent = "connected"; report("agent connected"); },
         onDisconnect: () => { st.textContent = "ended"; },
         onError: e => { st.textContent = "error"; report("agent error: " + (e && e.message || e)); },
-        onModeChange: m => { box.textContent = m.mode === "speaking" ? "🔊 Sri is speaking…" : "🎤 Listening…"; },
+        onModeChange: m => { box.textContent = m.mode === "speaking" ? "🔊 Shri is speaking…" : "🎤 Listening…"; },
         onMessage: m => {
           line(m.source === "user" ? "user" : "ai", m.message);
           report((m.source === "user" ? "YOU: " : "SRI: ") + m.message);

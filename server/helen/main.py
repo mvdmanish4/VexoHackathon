@@ -169,7 +169,7 @@ NAME_FIXES = [
     (r"\b(pipette|pipe it|pipe ?cut|pipe ?kat|pipe ?guide|pipe ?gate)\b", "Pipecat"),
     (r"\b(11|eleven|lemon|level)[ -]?labs?\b", "ElevenLabs"),
     (r"\bday[ -]?break\b", "Daybreak"),
-    (r"\b(shree|shri|sree|sheena|sriya)\b", "Sri"),
+    (r"\b(shree|shri|sri|sree|sheena|sriya)\b", "Shri"),
 ]
 
 
@@ -268,7 +268,7 @@ def phone_turn(text, from_band=False):
         words = " ".join(sorted(re.findall(r"[A-Za-z0-9]+", text), key=len, reverse=True)[:2]).upper() or "HI"
         pulses = buzz.pattern(words, 2.0)
         phone.send({"type": "buzz", "words": words, "pattern": pulses})
-        pause = random.uniform(4.0, 5.0)
+        pause = random.uniform(5.0, 10.0)   # Shri feels the vibration, then types his reply
         log(f">>> SRI: phone buzzes {buzz.length(pulses):.1f} s, then {pause:.1f} s pause, then answers")
         time.sleep(buzz.length(pulses) + pause)
         worker.join(timeout=10)
