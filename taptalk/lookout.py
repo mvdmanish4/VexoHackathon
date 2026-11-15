@@ -148,6 +148,7 @@ PAGE = r"""<!doctype html>
 </style></head><body class="unknown">
 <button id="start">Start</button>
 <button id="test" hidden style="position:fixed;left:8px;bottom:8px;font-size:4vw;padding:.5em .8em;opacity:.85">Test buzz</button>
+<div id="hint" hidden style="position:fixed;top:10px;left:0;right:0;font-size:4vw;opacity:.85">touch the screen to feel what is ahead</div>
 <div id="word" hidden></div><div id="what"></div><div id="morse"></div><div id="info"></div>
 <video id="cam" playsinline muted hidden></video>
 <script>
@@ -244,7 +245,7 @@ async function feelWord(word) {
   $("morse").textContent = "";
 }
 
-let stream = null;
+let stream = null, asking = false;
 async function openCam() {
   const cam = $("cam");
   stream = await navigator.mediaDevices.getUserMedia(
@@ -297,7 +298,7 @@ async function run() {              // for ever: one photo, the answer, then the
       await sleep(800);
     }
     if (iphone) await sleep(120);
-    told = await feelOnce(told);
+    if (!asking) told = await feelOnce(told);
     await sleep(level === "stop" ? 300 : 500);
   }
 }
@@ -313,12 +314,26 @@ $("start").onclick = async () => {
   tick();                            // a first touch unlocks haptics on the iPhone
   try { await openCam(); }
   catch (e) { $("info").textContent = "Camera not allowed: " + e.message; return; }
-  $("start").hidden = true; $("word").hidden = false; $("test").hidden = false;
+  $("start").hidden = true; $("word").hidden = false; $("test").hidden = false; $("hint").hidden = false;
   $("test").onclick = async () => {
     if (iphone) closeCam();
     for (let i = 0; i < 3; i++) { await pulse(250); await sleep(150); }
   };
   if (navigator.wakeLock) navigator.wakeLock.request("screen").catch(() => {});
+  // Touch anywhere = "what is ahead?": the answer is felt at once. Some iPhones only let a
+  // web page vibrate right after a touch, so this buzz starts inside the touch itself.
+  document.body.addEventListener("click", async e => {
+    if (e.target.tagName === "BUTTON" || asking) return;
+    asking = true;
+    hapticTick();                               // inside the touch
+    if (iphone) closeCam();
+    try {
+      if (level === "stop") { await alertTicks(); await feelWord(thing.split(" ")[0] || "STOP"); }
+      else if (level === "near") { await feelWord("N"); }
+      else if (level === "clear") { await pulse(60); }                  // one short pulse = clear
+      else { await pulse(60); await sleep(120); await pulse(60); }       // two = not sure
+    } finally { asking = false; }
+  });
   run();
 };
 </script></body></html>
@@ -398,6 +413,9 @@ def main():
                    help="address of the team's iPhone receiver server, e.g. http://localhost:8765 : "
                         "each new danger is sent there and the native iPhone app vibrates it in Morse "
                         "(real haptics). Its code is read from VEXO_RECEIVER_CODE if needed")
+    p.add_argument("--preview-script", default="",
+                   help="path to the team's ios/receiver-app/iphone_preview.py; served at /iphone_preview.py "
+                        "so the phone can download it and run it in the Pyto app (real haptics, no Xcode)")
     a = p.parse_args()
 
     gemini = Gemini()
@@ -418,6 +436,25 @@ def main():
             self.wfile.write(body)
 
         def do_GET(self):
+            route = self.path.split("?")[0]
+            if route == "/transcripts" and a.receiver:
+                # Pass the iPhone receiver's feed through this address, so the native app (or
+                # the Pyto script) can reach it at the same public link as this page.
+                try:
+                    req = urllib.request.Request(
+                        a.receiver.rstrip("/") + self.path,
+                        headers={"X-Vexo-Code": self.headers.get("X-Vexo-Code", "")})
+                    with urllib.request.urlopen(req, timeout=4) as r:
+                        return self._reply(200, "application/json", r.read())
+                except urllib.error.HTTPError as e:
+                    return self._reply(e.code, "application/json", e.read())
+                except (urllib.error.URLError, OSError):
+                    return self._reply(502, "text/plain", b"receiver not reachable")
+            if route == "/iphone_preview.py" and a.preview_script:
+                try:
+                    return self._reply(200, "text/x-python; charset=utf-8", Path(a.preview_script).read_bytes())
+                except OSError:
+                    return self._reply(404, "text/plain", b"not found")
             if self.path.split("?")[0] == "/haptic":
                 self._reply(200, "text/html; charset=utf-8", HAPTIC_TEST.encode())
             elif self.path.split("?")[0] == "/":
