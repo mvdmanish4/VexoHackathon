@@ -3,9 +3,12 @@
 The laptop serves one web page. The phone opens it, its rear camera sends a small photo
 about once a second, Gemini says whether something is in the way, and the phone vibrates:
 
-    stop  (about 1 m or closer)   fast ticks that do not stop
-    near  (about 1 to 3 m)        two slow ticks
+    stop  (about 1 m or closer)   three fast ticks, then the obstacle spelled in Morse
+                                  (WALL = .-- .- .-.. .-..), then three fast ticks repeating
+    near  (about 1 to 3 m)        N in Morse (-.), then one slow tick repeating
     clear                         nothing
+
+Morse is felt the same way as in Helen: a dot is one tick, a dash is two quick ticks.
 
 The laptop also says "Wall ahead" out loud once, so people nearby know why the person stopped.
 
@@ -36,7 +39,7 @@ LOOK_INSTRUCTIONS = (
     "This photo is the view straight ahead of a blind person who is walking slowly, taken "
     "from a phone held at chest height. Decide if a wall, door, person, furniture, step or "
     "other obstacle is in their path. Answer with JSON only: "
-    '{"level": "stop" | "near" | "clear", "what": "<one or two words, e.g. wall>"}. '
+    '{"level": "stop" | "near" | "clear", "what": "<ONE short word: wall, door, person, chair, table, step, pole>"}. '
     '"stop" = the obstacle fills most of the view or is within about 1 metre. '
     '"near" = it is about 1 to 3 metres ahead. '
     '"clear" = nothing in the path for 3 metres or more (then "what" is ""). '
@@ -98,12 +101,13 @@ PAGE = r"""<!doctype html>
   body.clear { background: #14803c; } body.unknown { background: #444; }
   #word { font-size: 22vw; font-weight: 800; line-height: 1; text-transform: uppercase; }
   #what { font-size: 8vw; min-height: 1.3em; margin-top: .2em; }
+  #morse { font-size: 9vw; min-height: 1.3em; font-family: ui-monospace, Menlo, monospace; letter-spacing: .1em; }
   #info { font-size: 4vw; opacity: .8; margin-top: 1em; padding: 0 1em; }
   button { font-size: 9vw; padding: .6em 1.2em; border: 0; border-radius: .4em; background: #fff; color: #111; }
   video { position: fixed; right: 8px; bottom: 8px; width: 28vw; border-radius: 8px; opacity: .85; }
 </style></head><body class="unknown">
 <button id="start">Start</button>
-<div id="word" hidden></div><div id="what"></div><div id="info"></div>
+<div id="word" hidden></div><div id="what"></div><div id="morse"></div><div id="info"></div>
 <video id="cam" playsinline muted hidden></video>
 <script>
 // Haptics: iPhone (iOS 18+) ticks when a hidden "switch" is flipped; Android uses vibrate.
@@ -119,22 +123,54 @@ function tick() {
 }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const $ = id => document.getElementById(id);
-let level = "unknown", seen = 0;
+let level = "unknown", thing = "", seen = 0;
 
 function show(l, what, ms) {
-  level = l; seen = Date.now();
+  level = l; thing = what || ""; seen = Date.now();
   document.body.className = l;
   $("word").textContent = l === "unknown" ? "?" : l;
   $("what").textContent = what || "";
   $("info").textContent = ms ? "looked in " + (ms / 1000).toFixed(1) + " s" : "";
 }
 
-async function feel() {             // runs for ever: turns the level into ticks
+// Morse by touch, the same way Helen sends words to the phone: a dot is one tick, a dash is
+// two quick ticks, and three fast ticks first mean "message coming".
+const MORSE = { A:".-", B:"-...", C:"-.-.", D:"-..", E:".", F:"..-.", G:"--.", H:"....", I:"..",
+  J:".---", K:"-.-", L:".-..", M:"--", N:"-.", O:"---", P:".--.", Q:"--.-", R:".-.", S:"...",
+  T:"-", U:"..-", V:"...-", W:".--", X:"-..-", Y:"-.--", Z:"--.." };
+const T = { tickGap: 110, symbolGap: 380, letterGap: 900 };
+async function alertTicks() { for (let i = 0; i < 3; i++) { tick(); await sleep(130); } }
+async function feelWord(word) {
+  const letters = word.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 6);
+  for (let i = 0; i < letters.length; i++) {
+    const code = MORSE[letters[i]];
+    $("morse").textContent = letters.slice(0, i + 1) + "   " + code;
+    for (const s of code) {
+      tick();
+      if (s === "-") { await sleep(T.tickGap); tick(); }
+      await sleep(T.symbolGap);
+    }
+    await sleep(T.letterGap);
+  }
+  $("morse").textContent = "";
+}
+
+async function feel() {             // runs for ever: turns what is ahead into touch
+  let told = "";                    // the warning already spelled out
   for (;;) {
     if (Date.now() - seen > 6000 && level !== "unknown") show("unknown", "no recent look");
-    if (level === "stop") { tick(); await sleep(140); }
-    else if (level === "near") { tick(); await sleep(220); tick(); await sleep(1100); }
-    else await sleep(150);
+    if (level === "stop") {
+      const word = (thing.split(" ")[0] || "STOP");
+      await alertTicks();                       // three fast ticks: danger, stop
+      if (told !== "stop:" + word) {            // new obstacle: spell what it is, once
+        told = "stop:" + word;
+        await sleep(500);
+        await feelWord(word);
+      } else await sleep(1000);                 // still there: keep warning
+    } else if (level === "near") {
+      if (told !== "near") { told = "near"; await feelWord("N"); }   // N = near
+      else { tick(); await sleep(1500); }       // one slow tick while it stays near
+    } else { if (level === "clear") told = ""; await sleep(150); }
   }
 }
 

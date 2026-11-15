@@ -126,10 +126,13 @@ python3 lookout.py        # prints an https:// address; open it on the phone (sa
 
 | Gemini says | The phone | The screen |
 |---|---|---|
-| `stop`: about 1 m or closer | fast ticks that do not stop | red |
-| `near`: about 1 to 3 m | two slow ticks | amber |
+| `stop`: about 1 m or closer | three fast ticks, then the obstacle spelled in Morse (`WALL` = `.-- .- .-.. .-..`), then three fast ticks repeating | red |
+| `near`: about 1 to 3 m | `N` in Morse (`-.`), then one slow tick repeating | amber |
 | `clear` | nothing | green |
 | no answer | nothing | grey `?` (never shown as clear) |
+
+Morse is felt the same way as in the rest of the project: a dot is one tick, a dash is two
+quick ticks. The screen shows the letters as they are felt.
 
 On `stop` the laptop also says it out loud once ("Wall ahead"), so people nearby know why
 the person stopped (`--quiet` turns that off). It needs `GEMINI_API_KEY` (see above).
