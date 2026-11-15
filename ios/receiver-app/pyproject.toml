@@ -1,0 +1,16 @@
+[project]
+name = "vexo-receive"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.163.0",
+    "httpx>=0.28.1",
+    "python-dotenv>=1.2.4",
+    "uvicorn>=0.54.0",
+]
+
+[project.optional-dependencies]
+band = [
+    "bleak>=3.1.0",
+    "pyserial>=3.5",
+]

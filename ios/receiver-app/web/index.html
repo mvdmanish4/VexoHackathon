@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#182419">
+  <title>Vexo | Speech receiver</title>
+  <link rel="stylesheet" href="/assets/style.css">
+  <script src="/assets/receiver.js" type="module"></script>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="brand">Vexo</p>
+      <h1>Speech receiver</h1>
+      <p>Turn spoken words into Morse vibrations.</p>
+    </header>
+    <section aria-labelledby="controls-heading">
+      <h2 id="controls-heading">Listening and playback</h2>
+      <form id="demo">
+        <label for="demo-text">Simulated transcript</label>
+        <textarea id="demo-text" rows="3" maxlength="2000" required>Um, could you please tell me if you're ready to go yet?</textarea>
+        <div class="controls">
+          <button id="send">Send simulated turn</button>
+          <button id="pause" type="button" class="secondary" aria-pressed="false">Pause playback</button>
+        </div>
+      </form>
+      <label for="speed">Dot length <output id="speed-value" for="speed">120 ms</output></label>
+      <input id="speed" type="range" min="60" max="300" step="10" value="120">
+      <p id="listening-status" role="status">Waiting for a transcript.</p>
+      <p id="playback-status" role="status">Ready for playback.</p>
+    </section>
+    <section aria-labelledby="transcript-heading">
+      <h2 id="transcript-heading">Transcript</h2>
+      <p id="empty">Band and simulated transcripts appear here.</p>
+      <ol id="history"></ol>
+    </section>
+  </main>
+</body>
+</html>
