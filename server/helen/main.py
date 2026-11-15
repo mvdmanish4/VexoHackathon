@@ -3,6 +3,7 @@
 #   someone speaks -> band mic -> Deepgram -> AI shortens -> Morse to feel
 #   .venv/bin/python -m helen.main 46
 import argparse
+import random
 import re
 import threading
 import time
@@ -177,16 +178,23 @@ def to_iphone(sentence):
 
 
 def agent_answer(sentence):
-    """Voice-agent mode: Sri answers out loud (one answer at a time)."""
+    """Voice-agent mode: after the person speaks, Sri waits 5-7 s (as if tapping) and says
+    her next scripted line. One line per turn; anything said while she is waiting or
+    speaking does not advance the script. After the last line she stops until a reset."""
+    if len(sentence.split()) < 3:
+        return                       # a fragment or a cough, not a turn in the conversation
     if not agent_lock.acquire(blocking=False):
-        return                       # already answering: don't talk over ourselves
+        return                       # already waiting or speaking: don't skip ahead
     try:
-        answer = agent.reply(sentence, history)
-        if answer:
-            log(f">>> SRI (voice agent) answers")
-            say_line(answer)
-        else:
-            log(f"--- not answered (not said to Sri): {sentence}")
+        step = script_step[0]
+        if step == 0 or step >= len(SCRIPT):
+            log("--- script: waiting for the intro tap" if step == 0 else "--- script finished (say reset to run again)")
+            return
+        pause = random.uniform(5.0, 7.0)
+        log(f">>> SRI (voice agent) answers line {step + 1} in {pause:.1f} s")
+        time.sleep(pause)
+        script_step[0] = step + 1
+        say_line(SCRIPT[step])
     except Exception as e:
         log(f"!!! voice agent failed: {e}")
     finally:
