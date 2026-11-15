@@ -312,7 +312,7 @@ document.getElementById("test").onclick = () => playMorse("... --- ...");
 <!-- ElevenLabs agent demo: open the page with ?agent. You talk to "Sri" (an ElevenLabs
      Conversational AI agent); every time you finish saying something, the phone vibrates. -->
 <script type="module">
-if (location.hash === "#agent" || new URLSearchParams(location.search).has("agent")) {
+if (location.hash === "#elevenlabs-agent") {   // off for the demo: it replies instantly and adds emotion; the main page has the 5-7 s pause
   const AGENT_ID = "agent_0501m7ed1sfsfe294sscwpvehxq1";
   document.body.innerHTML = `
     <header><h1>Helen</h1><span id="astatus">ready</span></header>

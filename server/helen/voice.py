@@ -16,7 +16,7 @@ def synthesize(text):
            "?output_format=mp3_44100_128")
     body = {"text": text, "model_id": config.get("ELEVENLABS_MODEL", "eleven_flash_v2_5"),
             # calm and even, not excitable
-            "voice_settings": {"stability": 0.8, "similarity_boost": 0.75, "style": 0.0, "speed": 0.95}}
+            "voice_settings": {"stability": 1.0, "similarity_boost": 0.75, "style": 0.0, "use_speaker_boost": False, "speed": 0.95}}
     req = urllib.request.Request(url, json.dumps(body).encode(), {
         "Content-Type": "application/json",
         "xi-api-key": config.get("ELEVENLABS_API_KEY", ""),
