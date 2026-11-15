@@ -159,8 +159,12 @@ const canVibrate = typeof navigator.vibrate === "function";
 const desktop = !canVibrate && !("ontouchstart" in window);
 // iPhone: a web page cannot always drive the Taptic Engine, so every pulse ALSO plays a loud
 // low tone. At full volume the phone's own speaker shakes the case enough to feel in the hand.
-const wantSound = desktop || !canVibrate || new URLSearchParams(location.search).has("sound");
-const phoneTone = !desktop && !canVibrate;
+const wantSound = desktop || new URLSearchParams(location.search).has("sound");
+const phoneTone = !desktop && !canVibrate && wantSound;
+// iPhone: the Taptic Engine is silenced while the camera is capturing (the same page with no
+// camera vibrates fine). So on an iPhone the camera is closed after each photo, the warning
+// is felt with the camera off, and the camera is opened again for the next look.
+const iphone = !desktop && !canVibrate;
 let audio = null;
 function buzz() {
   document.body.classList.remove("shake"); void document.body.offsetWidth;
@@ -238,60 +242,76 @@ async function feelWord(word) {
   $("morse").textContent = "";
 }
 
-async function feel() {             // runs for ever: turns what is ahead into touch
-  let told = "";                    // the warning already spelled out
-  for (;;) {
-    if (Date.now() - seen > 6000 && level !== "unknown") show("unknown", "no recent look");
-    if (level === "stop") {
-      const word = (thing.split(" ")[0] || "STOP");
-      await alertTicks();                       // three fast ticks: danger, stop
-      if (told !== "stop:" + word) {            // new obstacle: spell what it is, once
-        told = "stop:" + word;
-        await sleep(500);
-        await feelWord(word);
-      } else await sleep(1000);                 // still there: keep warning
-    } else if (level === "near") {
-      if (told !== "near") { told = "near"; await feelWord("N"); }   // N = near
-      else { await pulse(120); await sleep(1500); }   // one slow pulse while it stays near
-    } else { if (level === "clear") told = ""; await sleep(150); }
-  }
+let stream = null;
+async function openCam() {
+  const cam = $("cam");
+  stream = await navigator.mediaDevices.getUserMedia(
+    { video: { facingMode: { ideal: "environment" } }, audio: false });
+  cam.srcObject = stream; cam.hidden = false; await cam.play();
+  if (cam.readyState < 2) await new Promise(r => { cam.onloadeddata = r; setTimeout(r, 1500); });
+  await sleep(250);                 // let the exposure settle before the photo
+}
+function closeCam() {
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; $("cam").srcObject = null; }
 }
 
-async function watch() {            // runs for ever: one photo, wait for the answer, repeat
+async function feelOnce(told) {     // turn the latest answer into touch; returns what was told
+  if (level === "stop") {
+    const word = (thing.split(" ")[0] || "STOP");
+    await alertTicks();                         // three strong pulses: danger, stop
+    if (told !== "stop:" + word) {              // new danger: spell what it is, once
+      await sleep(500);
+      await feelWord(word);
+      return "stop:" + word;
+    }
+    return told;
+  }
+  if (level === "near") {
+    if (told !== "near") { await feelWord("N"); return "near"; }   // N = near
+    await pulse(120);                           // one pulse while it stays near
+    return told;
+  }
+  return level === "clear" ? "" : told;
+}
+
+async function run() {              // for ever: one photo, the answer, then the warning
   const cam = $("cam"), canvas = document.createElement("canvas");
+  let told = "";
   for (;;) {
     const began = Date.now();
     try {
+      if (!stream) await openCam();
       const w = 320, h = Math.round(w * cam.videoHeight / cam.videoWidth) || 240;
       canvas.width = w; canvas.height = h;
       canvas.getContext("2d").drawImage(cam, 0, 0, w, h);
+      if (iphone) closeCam();                   // camera off, so the iPhone may vibrate
       const blob = await new Promise(r => canvas.toBlob(r, "image/jpeg", 0.6));
       const res = await fetch("/look", { method: "POST", body: blob });
       const a = await res.json();
       show(a.level, a.what, Date.now() - began);
-    } catch (e) { show("unknown", "laptop not reachable"); }
-    await sleep(Math.max(0, 700 - (Date.now() - began)));
+    } catch (e) {
+      if (iphone) closeCam();
+      show("unknown", e && e.name === "NotAllowedError" ? "camera not allowed" : "laptop not reachable");
+      await sleep(800);
+    }
+    if (iphone) await sleep(120);
+    told = await feelOnce(told);
+    await sleep(level === "stop" ? 300 : 500);
   }
 }
 
 $("start").onclick = async () => {
-  if (wantSound) {
-    audio = new (window.AudioContext || window.webkitAudioContext)();
-    audio.resume();
-    // A silent looping <audio> keeps iPhone sound on even when the ring switch is on silent.
-    const keep = new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=");
-    keep.loop = true; keep.playsInline = true; keep.play().catch(() => {});
-  }
+  if (wantSound) audio = new (window.AudioContext || window.webkitAudioContext)();
   tick();                            // a first touch unlocks haptics on the iPhone
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia(
-      { video: { facingMode: { ideal: "environment" } }, audio: false });
-    const cam = $("cam"); cam.srcObject = stream; cam.hidden = false; await cam.play();
-  } catch (e) { $("info").textContent = "Camera not allowed: " + e.message; return; }
+  try { await openCam(); }
+  catch (e) { $("info").textContent = "Camera not allowed: " + e.message; return; }
   $("start").hidden = true; $("word").hidden = false; $("test").hidden = false;
-  $("test").onclick = async () => { for (let i = 0; i < 3; i++) { await pulse(250); await sleep(150); } };
+  $("test").onclick = async () => {
+    if (iphone) closeCam();
+    for (let i = 0; i < 3; i++) { await pulse(250); await sleep(150); }
+  };
   if (navigator.wakeLock) navigator.wakeLock.request("screen").catch(() => {});
-  feel(); watch();
+  run();
 };
 </script></body></html>
 """
