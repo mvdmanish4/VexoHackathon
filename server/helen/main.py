@@ -62,7 +62,7 @@ def say(words):
             listener.mute(30)            # don't transcribe our own voice
         speak(sentence)
         if listener:
-            listener.muted_until = time.monotonic() + 0.5
+            listener.muted_until = time.monotonic() + 3.0   # Deepgram finishes a sentence late
     except Exception as e:   # keep the server alive whatever the AI or voice service does
         log(f"!!! could not speak: {e}")
 
@@ -82,7 +82,24 @@ def say_on_phone(sentence):
     log("    (voice sent to the phone)")
 
 
+def words_of(text):
+    return {w.strip(".,!?'\"").lower() for w in text.split()} - {""}
+
+
+def is_echo(sentence):
+    """The band's mic hearing our own voice: mostly the same words as something we just said."""
+    heard_words = words_of(sentence)
+    for said in [h[4:] for h in history[-3:] if h.startswith("Me: ")]:
+        said_words = words_of(said)
+        if heard_words and said_words and len(heard_words & said_words) >= 0.6 * len(heard_words):
+            return True
+    return False
+
+
 def heard(sentence):
+    if is_echo(sentence):
+        log(f"--- ignored our own voice: {sentence}")
+        return
     log(f"((( HEARD: {sentence}")
     phone.send({"type": "heard", "text": sentence})
     history.append("Them: " + sentence)
