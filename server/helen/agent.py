@@ -27,11 +27,15 @@ Conversation so far:
 They just said: {sentence}"""
 
 
-def reply(sentence, history):
-    """Sri's spoken answer, or None when the sentence was not meant for Sri."""
-    answer = ask(PERSONA.format(sentence=sentence, history="\n".join(history[-8:]) or "(none)"))
+def reply(sentence, history, always=False):
+    """Sri's spoken answer, or None when the sentence was not meant for Sri.
+    always=True (they spoke into Sri's phone): it is for Sri, never skip."""
+    prompt = PERSONA.format(sentence=sentence, history="\n".join(history[-8:]) or "(none)")
+    if always:
+        prompt = prompt.replace("If what was heard is clearly not said to you", "(Ignore this rule:")
+    answer = ask(prompt)
     if not answer or answer.strip().upper().startswith("SKIP"):
-        return None
+        return None if not always else "Sorry, could you say that again?"
     return answer.strip().strip('"')
 
 

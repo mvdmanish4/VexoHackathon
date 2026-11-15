@@ -183,10 +183,11 @@ def heard(sentence):
         log(f"--- ignored our own voice: {sentence}")
         return
     log(f"((( HEARD: {sentence}")
-    phone.send({"type": "heard", "text": sentence})
-    history.append("Them: " + sentence)
+    last_band_heard[:] = [sentence, time.monotonic()]
     if VOICE_AGENT and PHONE_MIC:
         return                       # the phone's hold-to-talk button drives the conversation
+    phone.send({"type": "heard", "text": sentence})
+    history.append("Them: " + sentence)
     if VOICE_AGENT:
         threading.Thread(target=to_iphone, args=(sentence,), daemon=True).start()
         threading.Thread(target=agent_answer, args=(sentence,), daemon=True).start()
@@ -202,15 +203,46 @@ def to_iphone(sentence):
         log(f"!!! iPhone app server not reachable: {e}")
 
 
+last_band_heard = ["", 0.0]   # latest sentence the band mic heard, as a fallback transcript
+
+
 def spoke_into_phone(text):
-    """Hold-to-talk on the phone was released: the person said their line."""
-    text = fix_names(text) if text else "(spoke into the phone)"
-    log(f"((( HEARD (phone): {text}")
-    history.append("Them: " + text)
-    phone.send({"type": "heard", "text": text})
-    if text != "(spoke into the phone)":
+    """Hold-to-talk on the phone was released: the person said their turn.
+    Phone vibrates it -> 5-7 s pause -> Sri's AI reply plays on the phone."""
+    if not text and time.monotonic() - last_band_heard[1] < 20:
+        text = last_band_heard[0]                 # phone couldn't transcribe: use what the band heard
+    text = fix_names(text) if text else ""
+    log(f"((( HEARD (phone): {text or '(no words caught)'}")
+    if text:
+        history.append("Them: " + text)
+        phone.send({"type": "heard", "text": text})
         threading.Thread(target=to_iphone, args=(text,), daemon=True).start()
-    agent_answer(text, force=True)
+    phone_turn(text)
+
+
+def phone_turn(text):
+    if script_step[0] == 0:
+        log("--- press Start conversation first")
+        return
+    if not agent_lock.acquire(blocking=False):
+        return                                    # Sri is still answering the last turn
+    try:
+        reply = {}
+        worker = threading.Thread(target=lambda: reply.setdefault(
+            "text", agent.reply(text or "(they said something you did not catch)", history, always=True)))
+        worker.start()                            # think while the phone buzzes and Sri "types"
+        words = " ".join(sorted(re.findall(r"[A-Za-z0-9]+", text), key=len, reverse=True)[:2]).upper() or "HI"
+        pulses = buzz.pattern(words, 3.0)
+        phone.send({"type": "buzz", "words": words, "pattern": pulses})
+        pause = random.uniform(5.0, 7.0)
+        log(f">>> SRI: phone buzzes {buzz.length(pulses):.1f} s, then {pause:.1f} s pause, then answers")
+        time.sleep(buzz.length(pulses) + pause)
+        worker.join(timeout=10)
+        say_line(reply.get("text") or "Sorry, could you say that again?")
+    except Exception as e:
+        log(f"!!! Sri could not answer: {e}")
+    finally:
+        agent_lock.release()
 
 
 def agent_answer(sentence, force=False):
