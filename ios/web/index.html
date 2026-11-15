@@ -305,5 +305,80 @@ document.getElementById("resetConv").onclick = () => { conversationOn = false; s
 document.getElementById("replay").onclick = () => lastMorse && playMorse(lastMorse);
 document.getElementById("test").onclick = () => playMorse("... --- ...");
 </script>
+
+<!-- ElevenLabs agent demo: open the page with ?agent. You talk to "Sri" (an ElevenLabs
+     Conversational AI agent); every time you finish saying something, the phone vibrates. -->
+<script type="module">
+if (location.hash === "#agent" || new URLSearchParams(location.search).has("agent")) {
+  const AGENT_ID = "agent_0501m7ed1sfsfe294sscwpvehxq1";
+  document.body.innerHTML = `
+    <header><h1>Helen</h1><span id="astatus">ready</span></header>
+    <div id="abox" style="margin:20px 0;min-height:120px;border-radius:18px;background:#161a20;display:flex;
+         align-items:center;justify-content:center;padding:16px;text-align:center;font-size:22px;transition:background .06s">
+      Talk with Sri, a deafblind hackathon attendee</div>
+    <div id="alog" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:8px 0"></div>
+    <button id="astart" style="width:100%;padding:24px;font-size:22px;background:#2e7d4f">▶ Start conversation</button>
+    <button id="astop" style="width:100%;padding:16px;margin-top:10px;background:#7a2e2e;display:none">■ End</button>`;
+  const box = document.getElementById("abox"), st = document.getElementById("astatus"), alog = document.getElementById("alog");
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const canVibrate = typeof navigator.vibrate === "function";
+  function tick() {   // iPhone (iOS 18+): a hidden switch flip makes the Taptic Engine tick
+    const label = document.createElement("label"); label.style.display = "none";
+    const input = document.createElement("input"); input.type = "checkbox"; input.setAttribute("switch", "");
+    label.appendChild(input); document.head.appendChild(label); label.click(); document.head.removeChild(label);
+  }
+  // A strong buzz pattern (~2 s): bursts of rapid ticks on iPhone, real vibration on Android.
+  async function vibrate() {
+    const pattern = [[300, 150], [120, 150], [120, 150], [300, 150], [120, 150], [300, 0]];
+    if (canVibrate) navigator.vibrate(pattern.flat());
+    for (const [on, off] of pattern) {
+      box.style.background = "#ffffff";
+      const end = performance.now() + on;
+      while (performance.now() < end) { if (!canVibrate) tick(); await sleep(28); }
+      box.style.background = "#161a20";
+      await sleep(off);
+    }
+  }
+  function line(who, text) {
+    const d = document.createElement("div");
+    d.style.cssText = "padding:10px 14px;border-radius:14px;max-width:88%;" + (who === "user"
+      ? "background:#2a2416;color:#ffd27c;align-self:flex-start" : "background:#142433;color:#7cc4ff;align-self:flex-end");
+    d.textContent = (who === "user" ? "You: " : "Sri: ") + text;
+    alog.appendChild(d); alog.scrollTop = alog.scrollHeight;
+  }
+  const report = msg => fetch("/action/debug", { method: "POST", body: msg }).catch(() => {});
+  let conversation = null;
+  document.getElementById("astart").onclick = async () => {
+    tick();                                           // unlock haptics with this tap
+    st.textContent = "connecting…";
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      const { Conversation } = await import("https://cdn.jsdelivr.net/npm/@elevenlabs/client/+esm");
+      conversation = await Conversation.startSession({
+        agentId: AGENT_ID,
+        connectionType: "websocket",
+        onConnect: () => { st.textContent = "connected"; report("agent connected"); },
+        onDisconnect: () => { st.textContent = "ended"; },
+        onError: e => { st.textContent = "error"; report("agent error: " + (e && e.message || e)); },
+        onModeChange: m => { box.textContent = m.mode === "speaking" ? "🔊 Sri is speaking…" : "🎤 Listening…"; },
+        onMessage: m => {
+          line(m.source === "user" ? "user" : "ai", m.message);
+          report((m.source === "user" ? "YOU: " : "SRI: ") + m.message);
+          if (m.source === "user") vibrate();           // you spoke: Sri feels it on the phone
+        },
+      });
+      document.getElementById("astart").style.display = "none";
+      document.getElementById("astop").style.display = "block";
+    } catch (e) {
+      st.textContent = "could not start"; box.textContent = "⚠️ " + (e.message || e); report("agent start failed: " + (e.message || e));
+    }
+  };
+  document.getElementById("astop").onclick = async () => {
+    if (conversation) await conversation.endSession();
+    document.getElementById("astop").style.display = "none";
+    document.getElementById("astart").style.display = "block";
+  };
+}
+</script>
 </body>
 </html>

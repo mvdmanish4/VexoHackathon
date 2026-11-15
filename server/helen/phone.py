@@ -53,7 +53,7 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
     def do_GET(self):
-        if self.path in ("/", "/index.html"):
+        if self.path.split("?")[0] in ("/", "/index.html"):
             self._reply(200, "text/html; charset=utf-8", PAGE.read_bytes())
         elif self.path.startswith("/audio/"):
             try:
