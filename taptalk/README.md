@@ -110,11 +110,40 @@ the fallback.
 5. Blindfold test: a teammate taps `... --- ...` with eyes closed, turns the wrist over, and
    the laptop says "SOS".
 
+## Lookout: the phone warns of a wall ahead
+
+A second helper for the same person. The phone's camera looks ahead and the phone vibrates
+when something is in the way. No app: the laptop serves a web page.
+
+```bash
+python3 lookout.py        # prints an https:// address; open it on the phone (same Wi-Fi)
+```
+
+1. The first time, the phone warns about the certificate (a camera page needs HTTPS and the
+   laptop makes its own certificate): **Show details → visit this website**.
+2. Press **Start** and allow the camera. Hold the phone at chest height, camera forward.
+3. About once a second a small photo goes to the laptop and **Gemini** says what is ahead.
+
+| Gemini says | The phone | The screen |
+|---|---|---|
+| `stop`: about 1 m or closer | fast ticks that do not stop | red |
+| `near`: about 1 to 3 m | two slow ticks | amber |
+| `clear` | nothing | green |
+| no answer | nothing | grey `?` (never shown as clear) |
+
+On `stop` the laptop also says it out loud once ("Wall ahead"), so people nearby know why
+the person stopped (`--quiet` turns that off). It needs `GEMINI_API_KEY` (see above).
+iPhone ticks need iOS 18 or newer; Android uses the normal vibration.
+
+Limits: Gemini judges distance from one photo, so it is a rough guess, and each look takes
+1.5–3 s. It is a demo for slow walking, not a safety device.
+
 ## Files
 
 - `morse.py`: the tap decoder (pure logic, unit-tested)
 - `sponsors.py`: Gemini and ElevenLabs, each with an offline fallback
 - `taptalk.py`: connects to the band, turns events into dots and dashes, speaks messages
+- `lookout.py`: the camera wall warning (web page for the phone + Gemini)
 - `tests/test_morse.py`: decoder tests
 - `vexo-open-kit/`: the official kit, unchanged (git-ignored; clone it here)
 
@@ -123,3 +152,6 @@ the fallback.
 Receiving: a hearing person speaks, Deepgram writes it down, and the words come back to the
 user as Morse vibrations they can feel. The band has no vibration motor, so this needs a
 small haptic add-on.
+
+Lookout with real distance: an iPhone Pro's LiDAR sensor measures the distance to a wall
+instantly and offline, but only from a native app, not a web page.
