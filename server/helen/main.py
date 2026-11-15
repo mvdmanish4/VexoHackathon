@@ -235,9 +235,9 @@ def phone_turn(text):
             "text", agent.reply(text or "(they said something you did not catch)", history, always=True)))
         worker.start()                            # think while the phone buzzes and Sri "types"
         words = " ".join(sorted(re.findall(r"[A-Za-z0-9]+", text), key=len, reverse=True)[:2]).upper() or "HI"
-        pulses = buzz.pattern(words, 3.0)
+        pulses = buzz.pattern(words, 2.0)
         phone.send({"type": "buzz", "words": words, "pattern": pulses})
-        pause = random.uniform(5.0, 7.0)
+        pause = random.uniform(4.0, 5.0)
         log(f">>> SRI: phone buzzes {buzz.length(pulses):.1f} s, then {pause:.1f} s pause, then answers")
         time.sleep(buzz.length(pulses) + pause)
         worker.join(timeout=10)
